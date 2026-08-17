@@ -11,4 +11,3 @@ initSocketServer(httpServer);
 httpServer.listen(env.PORT, () => {
   logger.info(`Abo backend listening on port ${env.PORT}`);
 });
-0
