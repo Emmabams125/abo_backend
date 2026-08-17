@@ -1,0 +1,470 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+// ── Identity & Auth ──────────────────────────────────────────────
+
+model User {
+  id                   String   @id @default(uuid())
+  phone                String   @unique
+  name                 String?
+  avatarUrl            String?
+  emergencyContacts    Json?
+  medicalInfoEncrypted String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  memberships             CircleMembership[]
+  createdCircles          FamilyCircle[]            @relation("CircleCreator")
+  devices                 Device[]
+  refreshTokens           RefreshToken[]
+  locationPings           LocationPing[]
+  createdSafePlaces       SafePlace[]               @relation("SafePlaceCreator")
+  safePlaceEvents         SafePlaceEvent[]
+  sosEvents               SOSEvent[]
+  sosNotifications        SOSNotification[]
+  communityAlerts         CommunityAlert[]
+  checkIns                CheckIn[]
+  checkInReminders        CheckInReminder[]
+  sentMessages            Message[]
+  conversationMemberships ConversationParticipant[]
+  auditLogsAsActor        AuditLog[]                @relation("AuditActor")
+  auditLogsAsTarget       AuditLog[]                @relation("AuditTarget")
+
+  @@map("users")
+}
+
+model OtpChallenge {
+  id          String    @id @default(uuid())
+  phone       String
+  codeHash    String
+  attempts    Int       @default(0)
+  expiresAt   DateTime
+  lockedUntil DateTime?
+  consumedAt  DateTime?
+  lastSentAt  DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+
+  @@index([phone])
+  @@map("otp_challenges")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  deviceId  String?
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ── Family Circle ────────────────────────────────────────────────
+
+model FamilyCircle {
+  id        String   @id @default(uuid())
+  name      String
+  createdBy String
+  createdAt DateTime @default(now())
+
+  creator           User                      @relation("CircleCreator", fields: [createdBy], references: [id])
+  memberships       CircleMembership[]
+  invites           CircleInvite[]
+  auditLogs         AuditLog[]
+  safePlaces        SafePlace[]
+  locationRetention LocationRetentionSetting?
+  sosEvents         SOSEvent[]
+  checkIns          CheckIn[]
+  conversations     Conversation[]
+  subscription      Subscription?
+
+  @@map("family_circles")
+}
+
+enum CircleRole {
+  ADMIN
+  ADULT
+  MANAGED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  PENDING_APPROVAL
+  REMOVED
+}
+
+model CircleMembership {
+  id                   String           @id @default(uuid())
+  userId               String
+  circleId             String
+  role                 CircleRole
+  status               MembershipStatus @default(ACTIVE)
+  managedNoticeAckedAt DateTime?
+  joinedAt             DateTime         @default(now())
+
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  circle FamilyCircle @relation(fields: [circleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, circleId])
+  @@index([circleId])
+  @@map("circle_memberships")
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+model CircleInvite {
+  id        String       @id @default(uuid())
+  circleId  String
+  code      String       @unique
+  createdBy String
+  status    InviteStatus @default(PENDING)
+  expiresAt DateTime
+  createdAt DateTime     @default(now())
+
+  circle FamilyCircle @relation(fields: [circleId], references: [id], onDelete: Cascade)
+
+  @@index([circleId])
+  @@map("circle_invites")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  circleId     String
+  actorId      String
+  action       String
+  targetUserId String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  circle FamilyCircle @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  actor  User         @relation("AuditActor", fields: [actorId], references: [id])
+  target User?        @relation("AuditTarget", fields: [targetUserId], references: [id])
+
+  @@index([circleId])
+  @@map("audit_logs")
+}
+
+// ── Devices ──────────────────────────────────────────────────────
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+}
+
+model Device {
+  id         String         @id @default(uuid())
+  userId     String
+  platform   DevicePlatform
+  pushToken  String?
+  lastSeenAt DateTime       @default(now())
+  createdAt  DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("devices")
+}
+
+// ── Location & Safe Places ───────────────────────────────────────
+// NOTE: `location` is declared `Unsupported` (rather than omitted) so Prisma's
+// migration diffing knows the column is intentional and never generates a
+// DROP COLUMN for it. Prisma Client can't read/write it directly — all access
+// goes through location.repository.ts via $queryRaw / $executeRaw. The column
+// itself is created/indexed by the hand-written raw-SQL migration alongside
+// the CREATE EXTENSION postgis statement (prisma/migrations/*_add_postgis).
+
+model LocationPing {
+  id         String                                @id @default(uuid())
+  userId     String
+  accuracy   Float?
+  batteryPct Int?
+  recordedAt DateTime                              @default(now())
+  location   Unsupported("geography(Point, 4326)")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, recordedAt])
+  @@index([location], type: Gist)
+  @@map("location_pings")
+}
+
+model SafePlace {
+  id        String                                @id @default(uuid())
+  circleId  String
+  name      String
+  radiusM   Int
+  createdBy String
+  createdAt DateTime                              @default(now())
+  location  Unsupported("geography(Point, 4326)")
+
+  circle  FamilyCircle     @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  creator User             @relation("SafePlaceCreator", fields: [createdBy], references: [id])
+  events  SafePlaceEvent[]
+
+  @@index([circleId])
+  @@index([location], type: Gist)
+  @@map("safe_places")
+}
+
+enum SafePlaceEventType {
+  ARRIVAL
+  DEPARTURE
+}
+
+model SafePlaceEvent {
+  id          String             @id @default(uuid())
+  safePlaceId String
+  userId      String
+  type        SafePlaceEventType
+  occurredAt  DateTime           @default(now())
+
+  safePlace SafePlace @relation(fields: [safePlaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([safePlaceId, occurredAt])
+  @@index([userId, occurredAt])
+  @@map("safe_place_events")
+}
+
+model LocationRetentionSetting {
+  circleId      String   @id
+  retentionDays Int      @default(7)
+  updatedAt     DateTime @updatedAt
+
+  circle FamilyCircle @relation(fields: [circleId], references: [id], onDelete: Cascade)
+
+  @@map("location_retention_settings")
+}
+
+// ── Community ────────────────────────────────────────────────────
+// Deliberately no "community" group/membership model: an alert's own
+// coordinates are queried by ST_DWithin against the requester's last-known
+// position (same proximity pattern as SafePlace), so "which community am I
+// in" is computed per-request rather than stored. See community/README in
+// the plan doc for rationale. `location` is Unsupported for the same reason
+// as LocationPing/SafePlace — all raw PostGIS SQL is isolated in
+// community.repository.ts.
+
+enum CommunityAlertKind {
+  MISSING
+  LOST_ITEM
+  HAZARD
+}
+
+enum CommunityAlertStatus {
+  ACTIVE
+  RESOLVED
+  EXPIRED
+}
+
+model CommunityAlert {
+  id          String                                @id @default(uuid())
+  authorId    String
+  kind        CommunityAlertKind
+  title       String
+  description String?
+  placeLabel  String
+  status      CommunityAlertStatus                  @default(ACTIVE)
+  expiresAt   DateTime
+  createdAt   DateTime                              @default(now())
+  resolvedAt  DateTime?
+  location    Unsupported("geography(Point, 4326)")
+
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([authorId])
+  @@index([status, expiresAt])
+  @@index([location], type: Gist)
+  @@map("community_alerts")
+}
+
+// ── SOS / Emergency ──────────────────────────────────────────────
+
+enum SOSStatus {
+  ACTIVE
+  RESOLVED
+}
+
+model SOSEvent {
+  id              String    @id @default(uuid())
+  userId          String
+  circleId        String
+  triggeredAt     DateTime  @default(now())
+  payloadSnapshot Json
+  status          SOSStatus @default(ACTIVE)
+
+  user          User              @relation(fields: [userId], references: [id])
+  circle        FamilyCircle      @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  notifications SOSNotification[]
+
+  @@index([circleId, triggeredAt])
+  @@map("sos_events")
+}
+
+enum SOSDeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+}
+
+model SOSNotification {
+  id             String            @id @default(uuid())
+  sosEventId     String
+  memberId       String
+  deliveryStatus SOSDeliveryStatus @default(PENDING)
+  deliveredAt    DateTime?
+  acknowledgedAt DateTime?
+  attempts       Int               @default(0)
+  createdAt      DateTime          @default(now())
+
+  sosEvent SOSEvent @relation(fields: [sosEventId], references: [id], onDelete: Cascade)
+  member   User     @relation(fields: [memberId], references: [id])
+
+  @@unique([sosEventId, memberId])
+  @@index([sosEventId])
+  @@map("sos_notifications")
+}
+
+// ── Reassurance Mode ─────────────────────────────────────────────
+
+model CheckIn {
+  id        String   @id @default(uuid())
+  userId    String
+  circleId  String
+  createdAt DateTime @default(now())
+
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  circle FamilyCircle @relation(fields: [circleId], references: [id], onDelete: Cascade)
+
+  @@index([circleId, createdAt])
+  @@index([userId, createdAt])
+  @@map("check_ins")
+}
+
+model CheckInReminder {
+  id        String   @id @default(uuid())
+  userId    String
+  remindAt  DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, remindAt])
+  @@map("check_in_reminders")
+}
+
+// ── Messages ─────────────────────────────────────────────────────
+
+model Conversation {
+  id        String   @id @default(uuid())
+  circleId  String
+  isGroup   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  circle       FamilyCircle              @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([circleId])
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id             String   @id @default(uuid())
+  conversationId String
+  userId         String
+  joinedAt       DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id                     String    @id @default(uuid())
+  conversationId         String
+  senderId               String
+  body                   String
+  locationShareExpiresAt DateTime?
+  locationShareUntilOff  Boolean   @default(false)
+  locationShareEndedAt   DateTime?
+  sentAt                 DateTime  @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id])
+
+  @@index([conversationId, sentAt])
+  @@map("messages")
+}
+
+// ── Subscription & Billing ───────────────────────────────────────
+
+enum SubscriptionTier {
+  FREE
+  PREMIUM
+  ENTERPRISE
+}
+
+enum BillingProvider {
+  APPLE_IAP
+  GOOGLE_IAP
+  PAYSTACK
+  FLUTTERWAVE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  DOWNGRADE_PENDING
+}
+
+model Subscription {
+  id              String             @id @default(uuid())
+  circleId        String             @unique
+  tier            SubscriptionTier   @default(FREE)
+  pendingTier     SubscriptionTier?
+  billingProvider BillingProvider?
+  renewsAt        DateTime?
+  status          SubscriptionStatus @default(ACTIVE)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  circle   FamilyCircle @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  invoices Invoice[]
+
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id             String   @id @default(uuid())
+  subscriptionId String
+  amountCents    Int
+  currency       String
+  issuedAt       DateTime @default(now())
+  externalRef    String?
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId, issuedAt])
+  @@map("invoices")
+}
