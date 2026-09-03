@@ -84,6 +84,7 @@ export const openApiSpec = {
     { name: "Devices" },
     { name: "Home" },
     { name: "Location" },
+    { name: "Media" },
     { name: "Messages" },
     { name: "Privacy Center" },
     { name: "Reassurance" },
@@ -344,6 +345,12 @@ export const openApiSpec = {
             placeLabel: { type: "string", minLength: 1, maxLength: 80 },
             lat: { type: "number", minimum: -90, maximum: 90 },
             lng: { type: "number", minimum: -180, maximum: 180 },
+            mediaUrl: {
+              type: "string",
+              format: "uri",
+              description: "Public URL from POST /media/upload-url (purpose: community) — must be provided together with mediaType.",
+            },
+            mediaType: { type: "string", enum: ["PHOTO", "VIDEO"] },
           },
         }),
         responses: { "201": okResponse("Created alert"), ...errorResponses(400, 401, 429) },
@@ -671,7 +678,55 @@ export const openApiSpec = {
         tags: ["SOS"],
         summary: "Get the timeline/audit log of an SOS event",
         parameters: [uuidParam("sosEventId", "SOS event ID")],
-        responses: { "200": okResponse("SOS event log"), ...errorResponses(401, 403, 404) },
+        responses: { "200": okResponse("SOS event log (videoUrl, if present, is a freshly signed URL)"), ...errorResponses(401, 403, 404) },
+      },
+    },
+    "/sos/{sosEventId}/video": {
+      patch: {
+        tags: ["SOS"],
+        summary: "Attach a recorded video to an SOS event (author only)",
+        parameters: [uuidParam("sosEventId", "SOS event ID")],
+        requestBody: jsonBody({
+          type: "object",
+          required: ["videoPath"],
+          properties: {
+            videoPath: {
+              type: "string",
+              description: "The `path` from POST /media/upload-url (purpose: sos-video) — a private-bucket path, not a public URL.",
+            },
+          },
+        }),
+        responses: { "200": okResponse("Updated SOS event"), ...errorResponses(400, 401, 403, 404) },
+      },
+    },
+
+    // ── Media ────────────────────────────────────────────────
+    "/media/upload-url": {
+      post: {
+        tags: ["Media"],
+        summary: "Mint a signed URL to upload a photo/video directly to storage",
+        requestBody: jsonBody({
+          type: "object",
+          required: ["purpose", "contentType"],
+          properties: {
+            purpose: { type: "string", enum: ["community", "sos-video"] },
+            contentType: {
+              type: "string",
+              enum: ["image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime"],
+            },
+          },
+        }),
+        responses: {
+          "200": okResponse("Signed upload URL", {
+            type: "object",
+            properties: {
+              uploadUrl: { type: "string", description: "PUT the file bytes here directly (Content-Type header must match)." },
+              path: { type: "string", description: "Pass this back as mediaUrl's source / videoPath, depending on purpose." },
+              publicUrl: { type: "string", description: "Only present for purpose=community — pass this as mediaUrl on POST /community." },
+            },
+          }),
+          ...errorResponses(400, 401),
+        },
       },
     },
 

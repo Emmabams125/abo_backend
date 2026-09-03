@@ -12,6 +12,7 @@ import { communityRouter } from "@/modules/community/community.routes";
 import { devicesRouter } from "@/modules/devices/devices.routes";
 import { homeRouter } from "@/modules/home/home.routes";
 import { locationRouter } from "@/modules/location/location.routes";
+import { mediaRouter } from "@/modules/media/media.routes";
 import { messagesRouter } from "@/modules/messages/messages.routes";
 import { privacyCenterRouter } from "@/modules/privacy-center/privacy-center.routes";
 import { reassuranceRouter } from "@/modules/reassurance/reassurance.routes";
@@ -48,6 +49,7 @@ export function createApp() {
   app.use("/devices", devicesRouter);
   app.use("/home", homeRouter);
   app.use("/location", locationRouter);
+  app.use("/media", mediaRouter);
   app.use("/sos", sosRouter);
   app.use("/reassurance", reassuranceRouter);
   app.use("/messages", messagesRouter);

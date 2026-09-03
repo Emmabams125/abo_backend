@@ -274,6 +274,11 @@ enum CommunityAlertStatus {
   EXPIRED
 }
 
+enum MediaType {
+  PHOTO
+  VIDEO
+}
+
 model CommunityAlert {
   id          String                                @id @default(uuid())
   authorId    String
@@ -285,6 +290,8 @@ model CommunityAlert {
   expiresAt   DateTime
   createdAt   DateTime                              @default(now())
   resolvedAt  DateTime?
+  mediaUrl    String?
+  mediaType   MediaType?
   location    Unsupported("geography(Point, 4326)")
 
   author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
@@ -309,6 +316,7 @@ model SOSEvent {
   triggeredAt     DateTime  @default(now())
   payloadSnapshot Json
   status          SOSStatus @default(ACTIVE)
+  videoUrl        String?
 
   user          User              @relation(fields: [userId], references: [id])
   circle        FamilyCircle      @relation(fields: [circleId], references: [id], onDelete: Cascade)

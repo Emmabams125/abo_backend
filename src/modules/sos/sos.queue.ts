@@ -7,6 +7,8 @@ export interface SosJobData {
   sosEventId: string;
   memberId: string;
   triggeredByName: string;
+  /** True for the follow-up "video is now available" notification, rather than the initial trigger one. */
+  videoAttached?: boolean;
 }
 
 /**

@@ -7,6 +7,9 @@ import { enqueueSosNotification } from "@/modules/sos/sos.queue";
 import { sosRepository } from "@/modules/sos/sos.repository";
 import { emitToCircle } from "@/realtime/socket.server";
 import { SocketEvents, type SosAcknowledgedPayload, type SosTriggeredPayload } from "@/realtime/events";
+import { createReadUrl } from "@/storage/supabase-storage";
+
+const SOS_VIDEO_BUCKET = "sos-videos";
 
 const DUPLICATE_TRIGGER_WINDOW_MS = 15_000;
 
@@ -95,6 +98,39 @@ export const sosService = {
     const event = await sosRepository.findEventById(sosEventId);
     if (!event) throw new NotFoundError("SOS event not found");
     await requireActiveAdmin(event.circleId, requesterId);
-    return sosRepository.getLog(sosEventId);
+    const log = await sosRepository.getLog(sosEventId);
+
+    // videoUrl is a private-bucket path (see sos.validation.ts's attachVideoSchema
+    // comment) — resolved to a short-lived signed URL only here, at view time,
+    // never stored or returned as a permanently-public link.
+    if (log?.videoUrl) {
+      return { ...log, videoUrl: await createReadUrl(SOS_VIDEO_BUCKET, log.videoUrl) };
+    }
+    return log;
+  },
+
+  /** Author-only: only the person who triggered the SOS can attach their own recording. */
+  async attachVideo(sosEventId: string, userId: string, videoPath: string) {
+    const event = await sosRepository.findEventById(sosEventId);
+    if (!event) throw new NotFoundError("SOS event not found");
+    if (event.userId !== userId) {
+      throw new ForbiddenError("Only the person who triggered this SOS can attach a video to it");
+    }
+
+    const updated = await sosRepository.attachVideo(sosEventId, videoPath);
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const members = await circlesRepository.listActiveMemberships(event.circleId);
+    for (const member of members) {
+      if (member.userId === userId) continue;
+      await enqueueSosNotification({
+        sosEventId,
+        memberId: member.userId,
+        triggeredByName: user?.name ?? "A Circle member",
+        videoAttached: true,
+      });
+    }
+
+    return updated;
   },
 };

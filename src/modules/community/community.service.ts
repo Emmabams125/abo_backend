@@ -1,4 +1,4 @@
-import type { CommunityAlertKind } from "@prisma/client";
+import type { CommunityAlertKind, MediaType } from "@prisma/client";
 import { env } from "@/config/env";
 import { ForbiddenError, NotFoundError } from "@/common/errors/app-error";
 import { communityRepository } from "@/modules/community/community.repository";
@@ -21,6 +21,8 @@ export const communityService = {
       placeLabel: string;
       lat: number;
       lng: number;
+      mediaUrl?: string;
+      mediaType?: MediaType;
     }
   ) {
     const expiresAt = computeExpiresAt(input.kind);
@@ -32,7 +34,9 @@ export const communityService = {
       input.lat,
       input.lng,
       expiresAt,
-      input.description
+      input.description,
+      input.mediaUrl,
+      input.mediaType
     );
     return { id, expiresAt, ...input };
   },

@@ -49,6 +49,10 @@ export const sosRepository = {
     return prisma.sOSEvent.update({ where: { id: sosEventId }, data: { status: "RESOLVED" } });
   },
 
+  attachVideo(sosEventId: string, videoPath: string) {
+    return prisma.sOSEvent.update({ where: { id: sosEventId }, data: { videoUrl: videoPath } });
+  },
+
   getLog(sosEventId: string) {
     return prisma.sOSEvent.findUnique({
       where: { id: sosEventId },

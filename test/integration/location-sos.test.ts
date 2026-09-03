@@ -143,4 +143,30 @@ describe("SOS — FR-SOS-01/02", () => {
       .set("Authorization", `Bearer ${member.accessToken}`)
       .expect(403);
   });
+
+  it("only lets the triggering user attach a video to their own SOS event", async () => {
+    const admin = await signUpUser(app);
+    const member = await signUpUser(app);
+    const circleId = await createCircleWithSecondMember(admin.accessToken, member.accessToken, member.phone);
+
+    const sos = await request(app)
+      .post("/sos/trigger")
+      .set("Authorization", `Bearer ${admin.accessToken}`)
+      .send({ circleId })
+      .expect(201);
+
+    await request(app)
+      .patch(`/sos/${sos.body.id}/video`)
+      .set("Authorization", `Bearer ${member.accessToken}`)
+      .send({ videoPath: `${member.userId}/some-video.mp4` })
+      .expect(403);
+
+    const attached = await request(app)
+      .patch(`/sos/${sos.body.id}/video`)
+      .set("Authorization", `Bearer ${admin.accessToken}`)
+      .send({ videoPath: `${admin.userId}/some-video.mp4` })
+      .expect(200);
+
+    expect(attached.body.videoUrl).toBe(`${admin.userId}/some-video.mp4`);
+  });
 });

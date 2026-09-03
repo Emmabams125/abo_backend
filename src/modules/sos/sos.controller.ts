@@ -21,4 +21,9 @@ export const sosController = {
     const log = await sosService.getLog(req.params.sosEventId!, req.userId!);
     res.status(200).json(log);
   },
+
+  async attachVideo(req: Request, res: Response) {
+    const event = await sosService.attachVideo(req.params.sosEventId!, req.userId!, req.body.videoPath);
+    res.status(200).json(event);
+  },
 };

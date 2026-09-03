@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { Prisma, type CommunityAlertKind } from "@prisma/client";
+import { Prisma, type CommunityAlertKind, type MediaType } from "@prisma/client";
 import { prisma } from "@/db/prisma.client";
 
 export interface NearbyAlert {
@@ -11,6 +11,8 @@ export interface NearbyAlert {
   placeLabel: string;
   createdAt: Date;
   distanceMeters: number;
+  mediaUrl: string | null;
+  mediaType: MediaType | null;
 }
 
 /** All raw PostGIS SQL is isolated here — nothing above this layer touches geometry directly. */
@@ -23,12 +25,14 @@ export const communityRepository = {
     lat: number,
     lng: number,
     expiresAt: Date,
-    description?: string
+    description?: string,
+    mediaUrl?: string,
+    mediaType?: MediaType
   ) {
     const id = randomUUID();
     await prisma.$executeRaw`
       INSERT INTO "community_alerts"
-        (id, "authorId", "kind", "title", "description", "placeLabel", "expiresAt", "createdAt", "location")
+        (id, "authorId", "kind", "title", "description", "placeLabel", "expiresAt", "createdAt", "mediaUrl", "mediaType", "location")
       VALUES (
         ${id},
         ${authorId},
@@ -38,6 +42,8 @@ export const communityRepository = {
         ${placeLabel},
         ${expiresAt},
         now(),
+        ${mediaUrl ?? null},
+        ${mediaType ?? null}::"MediaType",
         ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography
       )
     `;
@@ -60,6 +66,8 @@ export const communityRepository = {
         "description",
         "placeLabel",
         "createdAt",
+        "mediaUrl",
+        "mediaType",
         ST_Distance("location", ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography) AS "distanceMeters"
       FROM "community_alerts"
       WHERE "status" = 'ACTIVE'

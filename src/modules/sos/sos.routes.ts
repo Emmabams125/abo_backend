@@ -3,7 +3,7 @@ import { requireAuth } from "@/common/middleware/auth";
 import { validate } from "@/common/middleware/validate";
 import { asyncHandler } from "@/common/utils/async-handler";
 import { sosController } from "@/modules/sos/sos.controller";
-import { sosEventParamsSchema, triggerSosSchema } from "@/modules/sos/sos.validation";
+import { attachVideoSchema, sosEventParamsSchema, triggerSosSchema } from "@/modules/sos/sos.validation";
 
 export const sosRouter = Router();
 
@@ -26,3 +26,9 @@ sosRouter.post(
 
 // FR-SOS-03
 sosRouter.get("/:sosEventId/log", validate({ params: sosEventParamsSchema }), asyncHandler(sosController.getLog));
+
+sosRouter.patch(
+  "/:sosEventId/video",
+  validate({ params: sosEventParamsSchema, body: attachVideoSchema }),
+  asyncHandler(sosController.attachVideo)
+);

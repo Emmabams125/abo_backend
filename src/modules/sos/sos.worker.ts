@@ -10,7 +10,7 @@ export function startSosWorker(): Worker<SosJobData> {
   const worker = new Worker<SosJobData>(
     SOS_QUEUE_NAME,
     async (job) => {
-      const { sosEventId, memberId, triggeredByName } = job.data;
+      const { sosEventId, memberId, triggeredByName, videoAttached } = job.data;
 
       const devices = await prisma.device.findMany({
         where: { userId: memberId, pushToken: { not: null } },
@@ -22,17 +22,33 @@ export function startSosWorker(): Worker<SosJobData> {
         return;
       }
 
+      const notification = videoAttached
+        ? {
+            title: "🎥 SOS video available",
+            body: `A video from ${triggeredByName}'s SOS is now available.`,
+          }
+        : {
+            title: "🚨 Emergency SOS",
+            body: `${triggeredByName} triggered an SOS alert. Tap to view their location.`,
+          };
+
       let anySucceeded = false;
       for (const device of devices) {
         const result = await pushService.sendToDevice(device.platform, device.pushToken!, {
-          title: "🚨 Emergency SOS",
-          body: `${triggeredByName} triggered an SOS alert. Tap to view their location.`,
+          ...notification,
           data: { type: "sos", sosEventId },
         });
         if (result.success) anySucceeded = true;
       }
 
-      await sosRepository.updateNotificationStatus(sosEventId, memberId, anySucceeded ? "DELIVERED" : "FAILED");
+      // SOSNotification's (sosEventId, memberId) row tracks the *trigger*
+      // broadcast specifically (FR-SOS-03's immutable log) — a video-attached
+      // job shares that same key but is a distinct, later notification, so it
+      // must not overwrite that record. BullMQ's own attempts/backoff (see
+      // sos.queue.ts) is sufficient retry tracking for this one.
+      if (!videoAttached) {
+        await sosRepository.updateNotificationStatus(sosEventId, memberId, anySucceeded ? "DELIVERED" : "FAILED");
+      }
 
       if (!anySucceeded) {
         throw new Error("All device push attempts failed for this member — will retry with backoff");
@@ -44,7 +60,7 @@ export function startSosWorker(): Worker<SosJobData> {
   worker.on("failed", async (job, err) => {
     if (!job) return;
     logger.error({ jobId: job.id, sosEventId: job.data.sosEventId, err }, "sos-broadcast job failed");
-    if (job.attemptsMade >= (job.opts.attempts ?? 1)) {
+    if (!job.data.videoAttached && job.attemptsMade >= (job.opts.attempts ?? 1)) {
       await sosRepository.updateNotificationStatus(job.data.sosEventId, job.data.memberId, "FAILED");
     }
   });

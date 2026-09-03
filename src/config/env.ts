@@ -53,6 +53,15 @@ const envSchema = z.object({
     .transform((v) => v === "true"),
 
   FIELD_ENCRYPTION_KEY: z.string().min(1),
+
+  // Supabase Storage (media uploads for Community posts + SOS video) — the
+  // same Supabase project already hosting Postgres, used here purely for its
+  // Storage product via the service-role key. Optional/empty-default like
+  // the other third-party credentials above so a missing key degrades that
+  // one feature instead of crashing the whole app on boot; see
+  // src/storage/supabase-storage.ts for the clear error thrown on first use.
+  SUPABASE_URL: z.string().optional().default(""),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional().default(""),
 });
 
 export const env = envSchema.parse(process.env);
