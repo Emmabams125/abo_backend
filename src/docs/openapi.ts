@@ -709,7 +709,7 @@ export const openApiSpec = {
           type: "object",
           required: ["purpose", "contentType"],
           properties: {
-            purpose: { type: "string", enum: ["community", "sos-video"] },
+            purpose: { type: "string", enum: ["community", "sos-video", "avatar"] },
             contentType: {
               type: "string",
               enum: ["image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime"],
@@ -722,7 +722,7 @@ export const openApiSpec = {
             properties: {
               uploadUrl: { type: "string", description: "PUT the file bytes here directly (Content-Type header must match)." },
               path: { type: "string", description: "Pass this back as mediaUrl's source / videoPath, depending on purpose." },
-              publicUrl: { type: "string", description: "Only present for purpose=community — pass this as mediaUrl on POST /community." },
+              publicUrl: { type: "string", description: "Only present for purpose=community/avatar — pass this as mediaUrl on POST /community, or avatarUrl on PATCH /users/me." },
             },
           }),
           ...errorResponses(400, 401),

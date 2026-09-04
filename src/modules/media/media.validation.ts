@@ -10,6 +10,6 @@ export const CONTENT_TYPE_EXT: Record<string, string> = {
 };
 
 export const uploadUrlSchema = z.object({
-  purpose: z.enum(["community", "sos-video"]),
+  purpose: z.enum(["community", "sos-video", "avatar"]),
   contentType: z.enum(Object.keys(CONTENT_TYPE_EXT) as [string, ...string[]]),
 });
