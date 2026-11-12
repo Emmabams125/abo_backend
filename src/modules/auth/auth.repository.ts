@@ -5,8 +5,16 @@ export const authRepository = {
     return prisma.user.findUnique({ where: { phone } });
   },
 
-  createUser(phone: string) {
-    return prisma.user.create({ data: { phone } });
+  findUserByEmail(email: string) {
+    return prisma.user.findUnique({ where: { email } });
+  },
+
+  createUser(phone: string, email?: string | null) {
+    return prisma.user.create({ data: { phone, email: email ?? undefined } });
+  },
+
+  setUserEmail(id: string, email: string) {
+    return prisma.user.update({ where: { id }, data: { email } });
   },
 
   findOrCreateUserByPhone(phone: string) {
@@ -26,10 +34,11 @@ export const authRepository = {
     });
   },
 
-  createOtpChallenge(data: { phone: string; codeHash: string; expiresAt: Date }) {
+  createOtpChallenge(data: { phone: string; email: string | null; codeHash: string; expiresAt: Date }) {
     return prisma.otpChallenge.create({
       data: {
         phone: data.phone,
+        email: data.email,
         codeHash: data.codeHash,
         expiresAt: data.expiresAt,
         lastSentAt: new Date(),

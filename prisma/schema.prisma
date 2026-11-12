@@ -14,6 +14,10 @@ datasource db {
 model User {
   id                   String   @id @default(uuid())
   phone                String   @unique
+  // Where OTP codes go while OTP_CHANNEL=email. Bound on first verification
+  // and never overwritten by a later request, so knowing someone's phone
+  // number isn't enough to have their codes sent to a different inbox.
+  email                String?  @unique
   name                 String?
   avatarUrl            String?
   emergencyContacts    Json?
@@ -44,6 +48,9 @@ model User {
 model OtpChallenge {
   id          String    @id @default(uuid())
   phone       String
+  // Destination inbox for this challenge (OTP_CHANNEL=email only); bound to
+  // the user on successful verification.
+  email       String?
   codeHash    String
   attempts    Int       @default(0)
   expiresAt   DateTime

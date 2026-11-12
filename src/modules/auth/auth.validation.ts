@@ -6,6 +6,8 @@ const phoneSchema = z
 
 export const requestOtpSchema = z.object({
   phone: phoneSchema,
+  // Only used while OTP_CHANNEL=email; ignored for phones that already have one bound.
+  email: z.string().trim().toLowerCase().email().optional(),
 });
 
 export const verifyOtpSchema = z.object({

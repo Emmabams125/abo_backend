@@ -135,11 +135,30 @@ export const openApiSpec = {
     "/auth/otp/request": {
       post: {
         tags: ["Auth"],
-        summary: "Request an OTP SMS to log in",
+        summary: "Request an OTP to log in (SMS, or email while OTP_CHANNEL=email)",
         security: [],
-        requestBody: jsonBody({ type: "object", required: ["phone"], properties: { phone: phoneSchema } }),
+        requestBody: jsonBody({
+          type: "object",
+          required: ["phone"],
+          properties: {
+            phone: phoneSchema,
+            email: {
+              type: "string",
+              format: "email",
+              description:
+                "Required when OTP_CHANNEL=email and the phone has no email bound yet; ignored once one is bound.",
+            },
+          },
+        }),
         responses: {
-          "202": okResponse("OTP sent", { type: "object", properties: { message: { type: "string" } } }),
+          "202": okResponse("OTP sent", {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              channel: { type: "string", enum: ["sms", "email"] },
+              destination: { type: "string", nullable: true, example: "ad***@gmail.com" },
+            },
+          }),
           ...errorResponses(400, 429),
         },
       },

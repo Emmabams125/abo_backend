@@ -35,9 +35,20 @@ const envSchema = z.object({
   COMMUNITY_HAZARD_TTL_HOURS: z.coerce.number().default(24),
   COMMUNITY_ALERT_TTL_DAYS: z.coerce.number().default(7),
 
+  // How OTP codes are delivered. "email" is a stopgap while the Termii sender
+  // ID is pending approval — see otp.service.ts for how the inbox is bound.
+  OTP_CHANNEL: z.enum(["sms", "email"]).default("sms"),
+
   SMS_PROVIDER: z.enum(["termii", "mock"]).default("mock"),
   TERMII_API_KEY: z.string().optional().default(""),
   TERMII_SENDER_ID: z.string().optional().default("Abo"),
+
+  EMAIL_PROVIDER: z.enum(["smtp", "mock"]).default("mock"),
+  SMTP_HOST: z.string().optional().default("smtp.gmail.com"),
+  SMTP_PORT: z.coerce.number().default(465),
+  SMTP_USER: z.string().optional().default(""),
+  SMTP_PASS: z.string().optional().default(""),
+  EMAIL_FROM: z.string().optional().default(""),
 
   FCM_PROJECT_ID: z.string().optional().default(""),
   FCM_CLIENT_EMAIL: z.string().optional().default(""),

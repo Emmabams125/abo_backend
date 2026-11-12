@@ -3,9 +3,17 @@ import bcrypt from "bcryptjs";
 import { env } from "@/config/env";
 import { BadRequestError, ForbiddenError, TooManyRequestsError } from "@/common/errors/app-error";
 import { authRepository } from "@/modules/auth/auth.repository";
+import { createEmailProvider } from "@/modules/auth/email-provider.factory";
 import { createSmsProvider } from "@/modules/auth/sms-provider.factory";
 
 const smsProvider = createSmsProvider();
+const emailProvider = createEmailProvider();
+
+export interface OtpDelivery {
+  channel: "sms" | "email";
+  /** Masked destination ("ad***@gmail.com") so the client can show where the code went. */
+  destination: string | null;
+}
 
 function generateOtpCode(): string {
   // 6-digit numeric code, uniformly distributed via rejection-free modulo of a random uint.
@@ -13,16 +21,42 @@ function generateOtpCode(): string {
   return n.toString().padStart(6, "0");
 }
 
+export function maskEmail(email: string): string {
+  const at = email.lastIndexOf("@");
+  return `${email.slice(0, Math.min(2, at))}***${email.slice(at)}`;
+}
+
+/**
+ * OTP_CHANNEL=email: works out which inbox gets the code. A phone that already
+ * has an email bound always uses that one, whatever the client sent — otherwise
+ * anyone who knew a phone number could log into that account with their own
+ * inbox. A phone without one (new user, or an account from before email OTP)
+ * uses the requested email, which is bound to the account on verification.
+ */
+async function resolveOtpEmail(phone: string, requestedEmail?: string): Promise<string> {
+  const user = await authRepository.findUserByPhone(phone);
+  if (user?.email) return user.email;
+
+  if (!requestedEmail) {
+    throw new BadRequestError("Email is required to receive a verification code");
+  }
+  const owner = await authRepository.findUserByEmail(requestedEmail);
+  if (owner && owner.phone !== phone) {
+    throw new BadRequestError("This email is already linked to another account");
+  }
+  return requestedEmail;
+}
+
 export const otpService = {
   /** FR-ONB-01: resend available after 30 seconds. */
-  async requestOtp(phone: string): Promise<void> {
+  async requestOtp(phone: string, requestedEmail?: string): Promise<OtpDelivery> {
     // TEMPORARY: while OTP_BYPASS_ENABLED, skip the real challenge/SMS flow
     // entirely for every phone number — this must never be true once real
     // users exist (see env.ts and the plan doc for the full rationale).
     // Never bypassed in NODE_ENV=test — the integration suite (and its
     // signUpUser helper) needs the real mock-provider path to work, same
     // reasoning as the test-env skip in rate-limit.ts.
-    if (env.OTP_BYPASS_ENABLED && env.NODE_ENV !== "test") return;
+    if (env.OTP_BYPASS_ENABLED && env.NODE_ENV !== "test") return { channel: env.OTP_CHANNEL, destination: null };
 
     const existing = await authRepository.findActiveOtpChallenge(phone);
 
@@ -38,21 +72,33 @@ export const otpService = {
       }
     }
 
+    const email = env.OTP_CHANNEL === "email" ? await resolveOtpEmail(phone, requestedEmail) : null;
+
     const code = generateOtpCode();
     const codeHash = await bcrypt.hash(code, 10);
     const expiresAt = new Date(Date.now() + env.OTP_TTL_MINUTES * 60_000);
 
-    await authRepository.createOtpChallenge({ phone, codeHash, expiresAt });
+    await authRepository.createOtpChallenge({ phone, email, codeHash, expiresAt });
+
+    if (email) {
+      await emailProvider.sendOtp(email, code);
+      return { channel: "email", destination: maskEmail(email) };
+    }
     await smsProvider.sendOtp(phone, code);
+    return { channel: "sms", destination: null };
   },
 
-  /** FR-ONB-01: OTP expires after 5 min; max 5 attempts before 15-min lockout. */
-  async verifyOtp(phone: string, code: string): Promise<void> {
+  /**
+   * FR-ONB-01: OTP expires after 5 min; max 5 attempts before 15-min lockout.
+   * Returns the inbox the code was emailed to (null for SMS), for the caller
+   * to bind to the account.
+   */
+  async verifyOtp(phone: string, code: string): Promise<{ email: string | null }> {
     // TEMPORARY: see requestOtp's bypass comment above — must never be true
     // once real users exist, and never applies in NODE_ENV=test. Only the
     // exact bypass code is accepted; any other code still falls through to
     // the real challenge lookup and correctly fails.
-    if (env.OTP_BYPASS_ENABLED && env.NODE_ENV !== "test" && code === env.OTP_BYPASS_CODE) return;
+    if (env.OTP_BYPASS_ENABLED && env.NODE_ENV !== "test" && code === env.OTP_BYPASS_CODE) return { email: null };
 
     const challenge = await authRepository.findActiveOtpChallenge(phone);
     if (!challenge) {
@@ -81,5 +127,6 @@ export const otpService = {
     }
 
     await authRepository.consumeOtpChallenge(challenge.id);
+    return { email: challenge.email };
   },
 };

@@ -3,8 +3,8 @@ import { authService } from "@/modules/auth/auth.service";
 
 export const authController = {
   async requestOtp(req: Request, res: Response) {
-    await authService.requestOtp(req.body.phone);
-    res.status(202).json({ message: "OTP sent" });
+    const delivery = await authService.requestOtp(req.body.phone, req.body.email);
+    res.status(202).json({ message: "OTP sent", ...delivery });
   },
 
   async verifyOtp(req: Request, res: Response) {
@@ -24,8 +24,8 @@ export const authController = {
   },
 
   async requestReauthOtp(req: Request, res: Response) {
-    await authService.requestReauthOtp(req.body.phone);
-    res.status(202).json({ message: "OTP sent" });
+    const delivery = await authService.requestReauthOtp(req.body.phone, req.body.email);
+    res.status(202).json({ message: "OTP sent", ...delivery });
   },
 
   async verifyReauth(req: Request, res: Response) {

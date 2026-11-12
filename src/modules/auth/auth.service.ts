@@ -2,7 +2,7 @@ import { UnauthorizedError } from "@/common/errors/app-error";
 import { generateOpaqueToken, sha256 } from "@/common/utils/hash-token";
 import { refreshTokenTtlMs, signAccessToken, signReauthToken } from "@/common/utils/jwt";
 import { authRepository } from "@/modules/auth/auth.repository";
-import { otpService } from "@/modules/auth/otp.service";
+import { otpService, type OtpDelivery } from "@/modules/auth/otp.service";
 
 interface TokenPair {
   accessToken: string;
@@ -22,9 +22,9 @@ async function issueTokenPair(userId: string, deviceId?: string): Promise<TokenP
 }
 
 export const authService = {
-  /** FR-ONB-01 step 1: request a one-time SMS code. */
-  requestOtp(phone: string): Promise<void> {
-    return otpService.requestOtp(phone);
+  /** FR-ONB-01 step 1: request a one-time code by SMS, or by email while OTP_CHANNEL=email. */
+  requestOtp(phone: string, email?: string): Promise<OtpDelivery> {
+    return otpService.requestOtp(phone, email);
   },
 
   /**
@@ -36,10 +36,14 @@ export const authService = {
     code: string,
     deviceId?: string
   ): Promise<TokenPair & { userId: string; isNewUser: boolean }> {
-    await otpService.verifyOtp(phone, code);
+    const { email } = await otpService.verifyOtp(phone, code);
 
     const existing = await authRepository.findUserByPhone(phone);
-    const user = existing ?? (await authRepository.createUser(phone));
+    let user = existing ?? (await authRepository.createUser(phone, email));
+    // Accounts from before email OTP get their inbox bound on first email login.
+    if (existing && !existing.email && email) {
+      user = await authRepository.setUserEmail(existing.id, email);
+    }
     const tokens = await issueTokenPair(user.id, deviceId);
 
     return { ...tokens, userId: user.id, isNewUser: !existing };
@@ -65,8 +69,8 @@ export const authService = {
   },
 
   /** Re-auth step 1: reuses the OTP flow against the already-authenticated user's own phone. */
-  async requestReauthOtp(phone: string): Promise<void> {
-    return otpService.requestOtp(phone);
+  async requestReauthOtp(phone: string, email?: string): Promise<OtpDelivery> {
+    return otpService.requestOtp(phone, email);
   },
 
   /** Re-auth step 2: verifying the OTP proves live possession of the phone; issues a short reauth token. */
