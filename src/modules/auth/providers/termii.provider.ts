@@ -9,7 +9,7 @@ export class TermiiSmsProvider implements SmsProvider {
     // but this app stores/validates phone in E.164 with one (see phoneSchema).
     const to = phone.replace(/^\+/, "");
 
-    const res = await fetch("https://api.ng.termii.com/api/sms/send", {
+    const res = await fetch(`${env.TERMII_BASE_URL.replace(/\/+$/, "")}/api/sms/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

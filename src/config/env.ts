@@ -42,6 +42,8 @@ const envSchema = z.object({
   SMS_PROVIDER: z.enum(["termii", "mock"]).default("mock"),
   TERMII_API_KEY: z.string().optional().default(""),
   TERMII_SENDER_ID: z.string().optional().default("Abo"),
+  // Termii gives each account its own base URL (dashboard, API settings).
+  TERMII_BASE_URL: z.string().url().default("https://api.ng.termii.com"),
 
   EMAIL_PROVIDER: z.enum(["smtp", "mock"]).default("mock"),
   SMTP_HOST: z.string().optional().default("smtp.gmail.com"),
