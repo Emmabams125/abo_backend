@@ -22,7 +22,7 @@ systemctl enable --now redis-server
 systemctl restart redis-server
 
 echo "==> Adding 2GB swap (2GB RAM is tight while building)"
-if [ ! -f /swapfile ]; then
+if [ -z "$(swapon --show --noheadings)" ]; then
   fallocate -l 2G /swapfile
   chmod 600 /swapfile
   mkswap /swapfile
