@@ -23,6 +23,12 @@ import { usersRouter } from "@/modules/users/users.routes";
 export function createApp() {
   const app = express();
 
+  // Nginx sits in front of the API (deploy/nginx-abo.conf) and sets
+  // X-Forwarded-For. Trust exactly that one hop so req.ip is the client's
+  // address; otherwise every request looks like 127.0.0.1 and the rate
+  // limiters lump all users into one bucket.
+  app.set("trust proxy", 1);
+
   app.use(helmet());
   app.use(cors());
   app.use(express.json());
