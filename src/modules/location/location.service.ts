@@ -12,6 +12,17 @@ import {
 } from "@/realtime/events";
 import { prisma } from "@/db/prisma.client";
 
+/**
+ * Being in *a* Circle mustn't reveal anyone else's location: the person asked
+ * about has to be an active member of that same Circle.
+ */
+async function requireTargetInCircle(circleId: string, userId: string) {
+  const membership = await circlesRepository.findMembership(circleId, userId);
+  if (!membership || membership.status !== "ACTIVE") {
+    throw new NotFoundError("This person isn't a member of this Circle");
+  }
+}
+
 async function requireActiveMembership(circleId: string, userId: string) {
   const membership = await circlesRepository.findMembership(circleId, userId);
   if (!membership || membership.status !== "ACTIVE") {
@@ -84,12 +95,14 @@ export const locationService = {
 
   async getLatestLocation(userId: string, requesterId: string, circleId: string) {
     await requireActiveMembership(circleId, requesterId);
+    await requireTargetInCircle(circleId, userId);
     return locationRepository.getLatestLocationForUser(userId);
   },
 
   /** FR-LOC-03: history respects the Circle's configured retention window (default 7d, max 30d). */
   async getLocationHistory(userId: string, requesterId: string, circleId: string) {
     await requireActiveMembership(circleId, requesterId);
+    await requireTargetInCircle(circleId, userId);
     const retention = await prisma.locationRetentionSetting.findUnique({ where: { circleId } });
     const retentionDays = retention?.retentionDays ?? env.LOCATION_RETENTION_DEFAULT_DAYS;
     const since = new Date(Date.now() - retentionDays * 86_400_000);

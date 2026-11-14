@@ -17,6 +17,9 @@ circlesRouter.use(requireAuth);
 
 circlesRouter.post("/", validate({ body: createCircleSchema }), asyncHandler(circlesController.create));
 
+// Declared before "/:circleId/..." routes so "mine" isn't read as a circleId.
+circlesRouter.get("/mine", asyncHandler(circlesController.listMine));
+
 circlesRouter.get(
   "/:circleId/members",
   validate({ params: circleIdParamsSchema }),
@@ -33,6 +36,18 @@ circlesRouter.post(
   "/invites/accept",
   validate({ body: acceptInviteSchema }),
   asyncHandler(circlesController.acceptInvite)
+);
+
+circlesRouter.get(
+  "/:circleId/pending-memberships",
+  validate({ params: circleIdParamsSchema }),
+  asyncHandler(circlesController.listPending)
+);
+
+circlesRouter.post(
+  "/:circleId/memberships/:membershipId/decline",
+  validate({ params: membershipParamsSchema }),
+  asyncHandler(circlesController.declineMembership)
 );
 
 circlesRouter.post(

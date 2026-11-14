@@ -22,6 +22,25 @@ export const circlesController = {
     res.status(200).json(result);
   },
 
+  async listMine(req: Request, res: Response) {
+    const memberships = await circlesService.listMyMemberships(req.userId!);
+    res.status(200).json(memberships);
+  },
+
+  async listPending(req: Request, res: Response) {
+    const pending = await circlesService.listPendingMemberships(req.params.circleId!, req.userId!);
+    res.status(200).json(pending);
+  },
+
+  async declineMembership(req: Request, res: Response) {
+    const membership = await circlesService.declineMembership(
+      req.params.circleId!,
+      req.params.membershipId!,
+      req.userId!
+    );
+    res.status(200).json(membership);
+  },
+
   async approveMembership(req: Request, res: Response) {
     const membership = await circlesService.approveMembership(
       req.params.circleId!,

@@ -6,6 +6,7 @@ import swaggerUi from "swagger-ui-express";
 import { errorHandler, notFoundHandler } from "@/common/middleware/error-handler";
 import { openApiSpec } from "@/docs/openapi";
 import { logger } from "@/common/utils/logger";
+import { legalRouter } from "@/modules/legal/legal.routes";
 import { authRouter } from "@/modules/auth/auth.routes";
 import { circlesRouter } from "@/modules/circles/circles.routes";
 import { communityRouter } from "@/modules/community/community.routes";
@@ -48,6 +49,8 @@ export function createApp() {
     swaggerUi.setup(openApiSpec)
   );
 
+  // Public privacy policy + account deletion pages (Google Play listing).
+  app.use(legalRouter);
   app.use("/auth", authRouter);
   app.use("/circles", circlesRouter);
   app.use("/community", communityRouter);

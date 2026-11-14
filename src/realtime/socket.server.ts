@@ -32,6 +32,9 @@ export function initSocketServer(httpServer: HttpServer): Server {
   io.on("connection", (socket: Socket) => {
     const userId = socket.data.userId as string;
     logger.debug({ userId, socketId: socket.id }, "socket connected");
+    // Personal room: reaches this user even before they're an ACTIVE member
+    // of any Circle (e.g. "your join request was approved").
+    void socket.join(userRoom(userId));
 
     socket.on("circle:join", async (circleId: string, ack?: (ok: boolean) => void) => {
       const membership = await prisma.circleMembership.findUnique({
@@ -55,6 +58,18 @@ export function initSocketServer(httpServer: HttpServer): Server {
 
 export function circleRoom(circleId: string): string {
   return `circle:${circleId}`;
+}
+
+export function userRoom(userId: string): string {
+  return `user:${userId}`;
+}
+
+export function emitToUser(userId: string, event: string, payload: unknown): void {
+  if (!io) {
+    logger.warn({ userId, event }, "Socket.io not initialized — dropping realtime event");
+    return;
+  }
+  io.to(userRoom(userId)).emit(event, payload);
 }
 
 export function emitToCircle(circleId: string, event: string, payload: unknown): void {

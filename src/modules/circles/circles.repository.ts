@@ -1,6 +1,12 @@
 import { prisma } from "@/db/prisma.client";
 import type { CircleRole } from "@prisma/client";
 
+/**
+ * What Circle members may see of each other. Email, emergency contacts and
+ * medical info stay private to the account owner.
+ */
+const memberUserFields = { id: true, phone: true, name: true, avatarUrl: true } as const;
+
 export const circlesRepository = {
   createCircleWithAdmin(name: string, creatorId: string) {
     return prisma.$transaction(async (tx) => {
@@ -38,7 +44,25 @@ export const circlesRepository = {
   listActiveMemberships(circleId: string) {
     return prisma.circleMembership.findMany({
       where: { circleId, status: "ACTIVE" },
-      include: { user: true },
+      include: { user: { select: memberUserFields } },
+      orderBy: { joinedAt: "asc" },
+    });
+  },
+
+  listPendingMemberships(circleId: string) {
+    return prisma.circleMembership.findMany({
+      where: { circleId, status: "PENDING_APPROVAL" },
+      include: { user: { select: memberUserFields } },
+      orderBy: { joinedAt: "asc" },
+    });
+  },
+
+  /** Every Circle the user belongs to or has asked to join, newest first. */
+  listMembershipsForUser(userId: string) {
+    return prisma.circleMembership.findMany({
+      where: { userId, status: { in: ["ACTIVE", "PENDING_APPROVAL"] } },
+      include: { circle: { select: { id: true, name: true } } },
+      orderBy: { joinedAt: "desc" },
     });
   },
 
@@ -50,6 +74,13 @@ export const circlesRepository = {
 
   createMembership(circleId: string, userId: string, role: CircleRole, status: "ACTIVE" | "PENDING_APPROVAL") {
     return prisma.circleMembership.create({ data: { circleId, userId, role, status } });
+  },
+
+  reviveMembership(membershipId: string, status: "ACTIVE" | "PENDING_APPROVAL") {
+    return prisma.circleMembership.update({
+      where: { id: membershipId },
+      data: { status, role: "ADULT", joinedAt: new Date() },
+    });
   },
 
   updateMembershipRole(membershipId: string, role: CircleRole) {

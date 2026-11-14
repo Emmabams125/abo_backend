@@ -27,6 +27,12 @@ const envSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
   OTP_BYPASS_CODE: z.string().default("000000"),
+  // App-store review login: this one phone number accepts this one code, with
+  // no email/SMS sent. Off unless both are set. Use a number no real person has.
+  REVIEW_LOGIN_PHONE: z.string().regex(/^\+[1-9]\d{7,14}$/).optional(),
+  REVIEW_LOGIN_CODE: z.string().regex(/^\d{6}$/).optional(),
+  // Shown on the public /privacy and /delete-account pages. Optional.
+  SUPPORT_EMAIL: z.string().email().optional(),
 
   CIRCLE_INVITE_TTL_DAYS: z.coerce.number().default(7),
   LOCATION_RETENTION_DEFAULT_DAYS: z.coerce.number().default(7),

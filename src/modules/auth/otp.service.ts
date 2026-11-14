@@ -47,6 +47,11 @@ async function resolveOtpEmail(phone: string, requestedEmail?: string): Promise<
   return requestedEmail;
 }
 
+/** The single store-review account (see REVIEW_LOGIN_* in env.ts). */
+function isReviewLogin(phone: string): boolean {
+  return Boolean(env.REVIEW_LOGIN_PHONE && env.REVIEW_LOGIN_CODE && phone === env.REVIEW_LOGIN_PHONE);
+}
+
 export const otpService = {
   /** FR-ONB-01: resend available after 30 seconds. */
   async requestOtp(phone: string, requestedEmail?: string): Promise<OtpDelivery> {
@@ -57,6 +62,7 @@ export const otpService = {
     // signUpUser helper) needs the real mock-provider path to work, same
     // reasoning as the test-env skip in rate-limit.ts.
     if (env.OTP_BYPASS_ENABLED && env.NODE_ENV !== "test") return { channel: env.OTP_CHANNEL, destination: null };
+    if (isReviewLogin(phone)) return { channel: env.OTP_CHANNEL, destination: "the review account" };
 
     const existing = await authRepository.findActiveOtpChallenge(phone);
 
@@ -99,6 +105,10 @@ export const otpService = {
     // exact bypass code is accepted; any other code still falls through to
     // the real challenge lookup and correctly fails.
     if (env.OTP_BYPASS_ENABLED && env.NODE_ENV !== "test" && code === env.OTP_BYPASS_CODE) return { email: null };
+    if (isReviewLogin(phone)) {
+      if (code === env.REVIEW_LOGIN_CODE) return { email: null };
+      throw new BadRequestError("Incorrect verification code");
+    }
 
     const challenge = await authRepository.findActiveOtpChallenge(phone);
     if (!challenge) {

@@ -10,4 +10,5 @@ export const usersRouter = Router();
 usersRouter.use(requireAuth);
 
 usersRouter.get("/me", asyncHandler(usersController.getMe));
+usersRouter.delete("/me", asyncHandler(usersController.deleteMe));
 usersRouter.patch("/me", validate({ body: updateProfileSchema }), asyncHandler(usersController.updateMe));

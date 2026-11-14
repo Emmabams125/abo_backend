@@ -64,5 +64,10 @@ export interface LocationShareEndedPayload {
 export interface MembershipChangedPayload {
   membershipId: string;
   userId: string;
-  action: "ROLE_CHANGED" | "MEMBER_REMOVED" | "MEMBERSHIP_APPROVED";
+  action:
+    | "ROLE_CHANGED"
+    | "MEMBER_REMOVED"
+    | "MEMBERSHIP_APPROVED"
+    | "MEMBERSHIP_REQUESTED"
+    | "MEMBERSHIP_DECLINED";
 }
