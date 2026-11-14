@@ -134,3 +134,36 @@ describe("Push device registration", () => {
     expect(firstDevices.body).toEqual([expect.objectContaining({ id: firstDevice.body.id, pushToken: null })]);
   });
 });
+
+describe("SOS details for Circle members", () => {
+  it("lets members open an SOS and see who responded; the sender can resolve it", async () => {
+    const { admin, joiner, circleId, membershipId } = await circleWithPendingMember();
+    await request(app).post(`/circles/${circleId}/memberships/${membershipId}/approve`).set(auth(admin)).expect(200);
+    await request(app).post("/location/ping").set(auth(joiner)).send({ lat: 6.45, lng: 3.39 }).expect(202);
+
+    const sos = await request(app).post("/sos/trigger").set(auth(joiner)).send({ circleId }).expect(201);
+
+    const active = await request(app).get(`/sos/circles/${circleId}/active`).set(auth(admin)).expect(200);
+    expect(active.body.map((e: { id: string }) => e.id)).toContain(sos.body.id);
+
+    await request(app).post(`/sos/${sos.body.id}/acknowledge`).set(auth(admin)).expect(200);
+    const details = await request(app).get(`/sos/${sos.body.id}`).set(auth(admin)).expect(200);
+    expect(details.body).toEqual(
+      expect.objectContaining({
+        status: "ACTIVE",
+        location: { lat: 6.45, lng: 3.39 },
+        videoUrl: null,
+        sender: expect.objectContaining({ id: joiner.userId }),
+        responders: [expect.objectContaining({ userId: admin.userId })],
+      })
+    );
+    expect(details.body.sender.email).toBeUndefined();
+
+    const outsider = await signUpUser(app);
+    await request(app).get(`/sos/${sos.body.id}`).set(auth(outsider)).expect(403);
+
+    await request(app).post(`/sos/${sos.body.id}/resolve`).set(auth(joiner)).expect(200);
+    const after = await request(app).get(`/sos/circles/${circleId}/active`).set(auth(admin)).expect(200);
+    expect(after.body.map((e: { id: string }) => e.id)).not.toContain(sos.body.id);
+  });
+});

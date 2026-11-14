@@ -3,7 +3,12 @@ import { requireAuth } from "@/common/middleware/auth";
 import { validate } from "@/common/middleware/validate";
 import { asyncHandler } from "@/common/utils/async-handler";
 import { sosController } from "@/modules/sos/sos.controller";
-import { attachVideoSchema, sosEventParamsSchema, triggerSosSchema } from "@/modules/sos/sos.validation";
+import {
+  attachVideoSchema,
+  circleParamsSchema,
+  sosEventParamsSchema,
+  triggerSosSchema,
+} from "@/modules/sos/sos.validation";
 
 export const sosRouter = Router();
 
@@ -25,6 +30,12 @@ sosRouter.post(
 );
 
 // FR-SOS-03
+sosRouter.get(
+  "/circles/:circleId/active",
+  validate({ params: circleParamsSchema }),
+  asyncHandler(sosController.listActive)
+);
+sosRouter.get("/:sosEventId", validate({ params: sosEventParamsSchema }), asyncHandler(sosController.getDetails));
 sosRouter.get("/:sosEventId/log", validate({ params: sosEventParamsSchema }), asyncHandler(sosController.getLog));
 
 sosRouter.patch(

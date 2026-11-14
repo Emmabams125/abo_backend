@@ -9,6 +9,8 @@ export const SocketEvents = {
   MessageSent: "message:sent",
   LocationShareEnded: "location-share:ended",
   MembershipChanged: "membership:changed",
+  /** An SOS changed (video attached, someone responded, resolved): refetch it. */
+  SosUpdated: "sos:updated",
 } as const;
 
 export interface LocationUpdatedPayload {

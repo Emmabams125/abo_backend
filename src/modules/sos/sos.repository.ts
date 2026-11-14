@@ -1,6 +1,9 @@
 import { prisma } from "@/db/prisma.client";
 import type { SOSDeliveryStatus } from "@prisma/client";
 
+/** What Circle members may see of each other (no email / medical fields). */
+const publicUserFields = { id: true, name: true, avatarUrl: true, phone: true } as const;
+
 export const sosRepository = {
   findRecentActiveTrigger(userId: string, sinceMs: number) {
     return prisma.sOSEvent.findFirst({
@@ -56,7 +59,19 @@ export const sosRepository = {
   getLog(sosEventId: string) {
     return prisma.sOSEvent.findUnique({
       where: { id: sosEventId },
-      include: { notifications: { include: { member: true } }, user: true },
+      include: {
+        notifications: { include: { member: { select: publicUserFields } } },
+        user: { select: publicUserFields },
+      },
+    });
+  },
+
+  /** Unresolved SOS events in a Circle from the last [sinceMs]. */
+  listActiveForCircle(circleId: string, sinceMs: number) {
+    return prisma.sOSEvent.findMany({
+      where: { circleId, status: "ACTIVE", triggeredAt: { gte: new Date(Date.now() - sinceMs) } },
+      include: { user: { select: publicUserFields } },
+      orderBy: { triggeredAt: "desc" },
     });
   },
 };

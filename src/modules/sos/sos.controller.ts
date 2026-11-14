@@ -17,6 +17,16 @@ export const sosController = {
     res.status(200).json(result);
   },
 
+  async getDetails(req: Request, res: Response) {
+    const details = await sosService.getDetails(req.params.sosEventId!, req.userId!);
+    res.status(200).json(details);
+  },
+
+  async listActive(req: Request, res: Response) {
+    const active = await sosService.listActive(req.params.circleId!, req.userId!);
+    res.status(200).json(active);
+  },
+
   async getLog(req: Request, res: Response) {
     const log = await sosService.getLog(req.params.sosEventId!, req.userId!);
     res.status(200).json(log);
