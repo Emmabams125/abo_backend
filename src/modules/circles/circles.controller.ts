@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { listCircleActivity } from "@/modules/circles/circles.activity";
 import { circlesService } from "@/modules/circles/circles.service";
 
 export const circlesController = {
@@ -20,6 +21,14 @@ export const circlesController = {
   async acceptInvite(req: Request, res: Response) {
     const result = await circlesService.acceptInvite(req.body.code, req.userId!);
     res.status(200).json(result);
+  },
+
+  async listActivity(req: Request, res: Response) {
+    const items = await listCircleActivity(req.params.circleId!, req.userId!, {
+      userId: typeof req.query.userId === "string" ? req.query.userId : undefined,
+      limit: typeof req.query.limit === "string" ? Number(req.query.limit) || undefined : undefined,
+    });
+    res.status(200).json(items);
   },
 
   async listMine(req: Request, res: Response) {

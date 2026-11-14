@@ -9,7 +9,7 @@ export const reassuranceRepository = {
   listRecentForCircle(circleId: string, limit = 10) {
     return prisma.checkIn.findMany({
       where: { circleId },
-      include: { user: true },
+      include: { user: { select: { id: true, name: true, avatarUrl: true } } },
       orderBy: { createdAt: "desc" },
       take: limit,
     });

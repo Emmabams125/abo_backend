@@ -167,3 +167,25 @@ describe("SOS details for Circle members", () => {
     expect(after.body.map((e: { id: string }) => e.id)).not.toContain(sos.body.id);
   });
 });
+
+describe("Circle activity feed", () => {
+  it("merges check-ins, SOS and joins newest first, per member on request, members only", async () => {
+    const { admin, joiner, circleId, membershipId } = await circleWithPendingMember();
+    await request(app).post(`/circles/${circleId}/memberships/${membershipId}/approve`).set(auth(admin)).expect(200);
+    await request(app).post("/reassurance/check-in").set(auth(admin)).send({ circleId });
+    await request(app).post("/location/ping").set(auth(joiner)).send({ lat: 6.5, lng: 3.4 }).expect(202);
+    await request(app).post("/sos/trigger").set(auth(joiner)).send({ circleId }).expect(201);
+
+    const feed = await request(app).get(`/circles/${circleId}/activity`).set(auth(admin)).expect(200);
+    const types = feed.body.map((i: { type: string }) => i.type);
+    expect(types[0]).toBe("SOS");
+    expect(types).toEqual(expect.arrayContaining(["MEMBER_JOINED"]));
+    expect(feed.body[0].user).toEqual({ id: joiner.userId, name: null, avatarUrl: null });
+
+    const mine = await request(app).get(`/circles/${circleId}/activity?userId=${joiner.userId}`).set(auth(admin)).expect(200);
+    expect(mine.body.every((i: { user: { id: string } }) => i.user.id === joiner.userId)).toBe(true);
+
+    const outsider = await signUpUser(app);
+    await request(app).get(`/circles/${circleId}/activity`).set(auth(outsider)).expect(403);
+  });
+});

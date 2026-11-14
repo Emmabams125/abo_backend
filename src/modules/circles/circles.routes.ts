@@ -38,6 +38,13 @@ circlesRouter.post(
   asyncHandler(circlesController.acceptInvite)
 );
 
+// Recent activity feed (?userId= for one member, ?limit= up to 100).
+circlesRouter.get(
+  "/:circleId/activity",
+  validate({ params: circleIdParamsSchema }),
+  asyncHandler(circlesController.listActivity)
+);
+
 circlesRouter.get(
   "/:circleId/pending-memberships",
   validate({ params: circleIdParamsSchema }),
