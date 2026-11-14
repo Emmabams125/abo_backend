@@ -33,8 +33,8 @@ export const reassuranceService = {
       await enqueuePush({
         userId: member.userId,
         message: {
-          title: "Abo",
-          body: `${user?.name ?? "A Circle member"} checked in: I'm okay`,
+          title: `${user?.name ?? "A Circle member"} checked in`,
+          body: "They're okay.",
           data: { type: "check-in", userId },
         },
       });

@@ -10,15 +10,34 @@ export const devicesRepository = {
     return prisma.device.findUnique({ where: { id: deviceId } });
   },
 
-  upsert(userId: string, deviceId: string | undefined, platform: DevicePlatform, pushToken?: string) {
-    if (deviceId) {
-      return prisma.device.upsert({
-        where: { id: deviceId },
-        update: { pushToken, lastSeenAt: new Date() },
-        create: { id: deviceId, userId, platform, pushToken },
+  async upsert(userId: string, deviceId: string | undefined, platform: DevicePlatform, pushToken?: string) {
+    return prisma.$transaction(async (tx) => {
+      const existing = deviceId ? await tx.device.findUnique({ where: { id: deviceId } }) : null;
+      const ownExisting = existing && existing.userId === userId ? existing : null;
+      // One phone = one push token. If another account (or an older row) still
+      // holds it — e.g. someone else logged out on this phone — detach it, or
+      // they'd keep receiving this user's alerts.
+      if (pushToken) {
+        await tx.device.updateMany({
+          where: { pushToken, ...(ownExisting ? { id: { not: ownExisting.id } } : {}) },
+          data: { pushToken: null },
+        });
+      }
+      if (ownExisting) {
+        return tx.device.update({
+          where: { id: ownExisting.id },
+          data: { pushToken, platform, lastSeenAt: new Date() },
+        });
+      }
+      // Unknown id, or one belonging to someone else: never touch their row.
+      return tx.device.create({
+        data: { ...(deviceId && !existing ? { id: deviceId } : {}), userId, platform, pushToken },
       });
-    }
-    return prisma.device.create({ data: { userId, platform, pushToken } });
+    });
+  },
+
+  clearPushToken(deviceId: string) {
+    return prisma.device.update({ where: { id: deviceId }, data: { pushToken: null } });
   },
 
   delete(deviceId: string) {

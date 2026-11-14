@@ -5,6 +5,11 @@ import type { PushMessage, PushProvider, PushSendResult } from "@/notifications/
 
 let app: admin.app.App | undefined;
 
+const DEAD_TOKEN_CODES = new Set([
+  "messaging/registration-token-not-registered",
+  "messaging/invalid-registration-token",
+]);
+
 function getApp(): admin.app.App {
   if (app) return app;
   if (!env.FCM_PROJECT_ID || !env.FCM_CLIENT_EMAIL || !env.FCM_PRIVATE_KEY) {
@@ -29,12 +34,25 @@ export class FcmPushProvider implements PushProvider {
           token: pushToken,
           notification: { title: message.title, body: message.body },
           data: message.data,
-          android: { priority: "high" },
+          android: {
+            priority: "high",
+            notification: {
+              channelId: message.channel ?? "circle_updates",
+              sound: "default",
+              ...(message.channel === "sos_alerts" ? { priority: "max" as const, defaultVibrateTimings: true } : {}),
+            },
+          },
         });
       return { success: true };
     } catch (err) {
-      logger.error({ err, pushToken }, "FCM send failed");
-      return { success: false, error: (err as Error).message };
+      const code = (err as { code?: string }).code ?? "";
+      const invalidToken = DEAD_TOKEN_CODES.has(code);
+      if (invalidToken) {
+        logger.info({ code }, "FCM token no longer valid");
+      } else {
+        logger.error({ err }, "FCM send failed");
+      }
+      return { success: false, error: (err as Error).message, invalidToken };
     }
   }
 }

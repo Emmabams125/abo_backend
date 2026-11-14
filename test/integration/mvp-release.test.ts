@@ -107,3 +107,30 @@ describe("Public legal pages", () => {
     expect(deletion.text).toContain("Delete your Abo account");
   });
 });
+
+describe("Push device registration", () => {
+  it("moves a push token to whoever is signed in on that phone, and never edits another user's device", async () => {
+    const first = await signUpUser(app);
+    const second = await signUpUser(app);
+    const token = `fcm-token-${Date.now()}`;
+
+    const firstDevice = await request(app)
+      .post("/devices")
+      .set(auth(first))
+      .send({ platform: "ANDROID", pushToken: token })
+      .expect(201);
+
+    // Second account signs in on the same phone and claims the first one's device id.
+    const secondDevice = await request(app)
+      .post("/devices")
+      .set(auth(second))
+      .send({ deviceId: firstDevice.body.id, platform: "ANDROID", pushToken: token })
+      .expect(201);
+
+    expect(secondDevice.body.id).not.toBe(firstDevice.body.id);
+    expect(secondDevice.body.userId).toBe(second.userId);
+
+    const firstDevices = await request(app).get("/devices").set(auth(first)).expect(200);
+    expect(firstDevices.body).toEqual([expect.objectContaining({ id: firstDevice.body.id, pushToken: null })]);
+  });
+});

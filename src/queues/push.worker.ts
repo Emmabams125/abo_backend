@@ -15,7 +15,9 @@ export function startPushWorker(): Worker<PushJobData> {
 
       for (const device of devices) {
         const result = await pushService.sendToDevice(device.platform, device.pushToken!, job.data.message);
-        if (!result.success) {
+        if (result.invalidToken) {
+          await prisma.device.update({ where: { id: device.id }, data: { pushToken: null } });
+        } else if (!result.success) {
           logger.warn({ deviceId: device.id, error: result.error }, "Push delivery failed for device");
         }
       }

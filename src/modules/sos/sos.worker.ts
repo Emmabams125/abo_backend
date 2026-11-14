@@ -36,9 +36,13 @@ export function startSosWorker(): Worker<SosJobData> {
       for (const device of devices) {
         const result = await pushService.sendToDevice(device.platform, device.pushToken!, {
           ...notification,
+          channel: "sos_alerts",
           data: { type: "sos", sosEventId },
         });
         if (result.success) anySucceeded = true;
+        if (result.invalidToken) {
+          await prisma.device.update({ where: { id: device.id }, data: { pushToken: null } });
+        }
       }
 
       // SOSNotification's (sosEventId, memberId) row tracks the *trigger*
