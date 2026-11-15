@@ -42,6 +42,16 @@ export class FcmPushProvider implements PushProvider {
               ...(message.channel === "sos_alerts" ? { priority: "max" as const, defaultVibrateTimings: true } : {}),
             },
           },
+          apns: {
+            headers: { "apns-priority": "10", "apns-push-type": "alert" },
+            payload: {
+              aps: {
+                sound: "default",
+                // SOS breaks through Focus / Do Not Disturb summaries.
+                ...(message.channel === "sos_alerts" ? { "interruption-level": "time-sensitive" } : {}),
+              },
+            },
+          },
         });
       return { success: true };
     } catch (err) {
