@@ -4,6 +4,7 @@ import { circlesRepository } from "@/modules/circles/circles.repository";
 import { locationRepository } from "@/modules/location/location.repository";
 import { safePlaceEventsRepository } from "@/modules/location/safe-place-events.repository";
 import { enqueuePush } from "@/queues/push.queue";
+import { maybeNotifyLowBattery } from "@/notifications/circle-push";
 import { emitToCircle } from "@/realtime/socket.server";
 import {
   SocketEvents,
@@ -91,6 +92,8 @@ export const locationService = {
 
       await evaluateSafePlaces(circleId, userId, lat, lng);
     }
+
+    await maybeNotifyLowBattery(userId, batteryPct);
   },
 
   async getLatestLocation(userId: string, requesterId: string, circleId: string) {

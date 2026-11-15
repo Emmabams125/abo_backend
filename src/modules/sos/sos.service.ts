@@ -8,6 +8,7 @@ import { SOS_ACTIVE_WINDOW_MS, sosRepository } from "@/modules/sos/sos.repositor
 import { emitToCircle } from "@/realtime/socket.server";
 import { SocketEvents, type SosAcknowledgedPayload, type SosTriggeredPayload } from "@/realtime/events";
 import { createReadUrl } from "@/storage/supabase-storage";
+import { nameOf, pushToCircle, pushToUsers } from "@/notifications/circle-push";
 
 const SOS_VIDEO_BUCKET = "sos-videos";
 
@@ -96,7 +97,22 @@ export const sosService = {
     const event = await sosRepository.findEventById(sosEventId);
     if (!event) throw new NotFoundError("SOS event not found");
 
+    const before = await prisma.sOSNotification.findUnique({
+      where: { sosEventId_memberId: { sosEventId, memberId } },
+      select: { acknowledgedAt: true },
+    });
     const updated = await sosRepository.acknowledge(sosEventId, memberId);
+
+    // "Bola is on the way" to the person who needs help: once per responder.
+    if (!before?.acknowledgedAt && memberId !== event.userId && event.status === "ACTIVE") {
+      await pushToUsers([event.userId], {
+        title: `${await nameOf(memberId)} is responding to your SOS`,
+        body: "Help is on the way. Keep your phone with you if you can.",
+        data: { type: "sos", sosEventId, circleId: event.circleId },
+        channel: "sos_alerts",
+      });
+    }
+
     const payload: SosAcknowledgedPayload = {
       sosEventId,
       memberId,
@@ -114,8 +130,26 @@ export const sosService = {
     // Anyone in the Circle can close it (e.g. they found them and they're
     // fine) — otherwise an SOS the sender can't close stays red for everyone.
     if (event.userId !== actorId) await requireActiveMember(event.circleId, actorId);
+    const wasActive = event.status === "ACTIVE";
     const resolved = await sosRepository.resolve(sosEventId);
     notifySosUpdated(event.circleId, sosEventId);
+
+    // "Ada is safe now" so nobody keeps worrying (or keeps driving over).
+    if (wasActive) {
+      const sender = await nameOf(event.userId);
+      const closedBySomeoneElse = actorId !== event.userId;
+      await pushToCircle(
+        event.circleId,
+        {
+          title: `✅ ${sender} is safe now`,
+          body: closedBySomeoneElse
+            ? `${await nameOf(actorId)} closed the SOS.`
+            : `${sender} marked the SOS as resolved.`,
+          data: { type: "sos-resolved", sosEventId, circleId: event.circleId },
+        },
+        [actorId]
+      );
+    }
     return resolved;
   },
 

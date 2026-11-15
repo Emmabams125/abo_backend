@@ -5,6 +5,7 @@ import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "@
 import { circlesRepository } from "@/modules/circles/circles.repository";
 import { emitToCircle, emitToUser } from "@/realtime/socket.server";
 import { SocketEvents, type MembershipChangedPayload } from "@/realtime/events";
+import { circleNameOf, nameOf, pushToAdmins, pushToCircle, pushToUsers } from "@/notifications/circle-push";
 
 /** Tells the Circle (and the member themself, via their personal room). */
 function notifyMembershipChanged(circleId: string, payload: MembershipChangedPayload) {
@@ -88,6 +89,26 @@ export const circlesService = {
       action: status === "PENDING_APPROVAL" ? "MEMBERSHIP_REQUESTED" : "MEMBERSHIP_APPROVED",
     });
 
+    const name = await nameOf(userId);
+    const circleName = await circleNameOf(invite.circleId);
+    if (status === "PENDING_APPROVAL") {
+      await pushToAdmins(invite.circleId, {
+        title: `${name} wants to join ${circleName}`,
+        body: "Open Abo to approve or decline.",
+        data: { type: "join-request", circleId: invite.circleId, membershipId: membership.id },
+      });
+    } else {
+      await pushToCircle(
+        invite.circleId,
+        {
+          title: `${name} joined ${circleName}`,
+          body: "They can now see the Circle and get SOS alerts.",
+          data: { type: "member-joined", circleId: invite.circleId, userId },
+        },
+        [userId]
+      );
+    }
+
     return { membership, requiresApproval: status === "PENDING_APPROVAL" };
   },
 
@@ -101,6 +122,24 @@ export const circlesService = {
     const updated = await circlesRepository.approveMembership(membershipId);
     await circlesRepository.writeAuditLog(circleId, actorId, "MEMBERSHIP_APPROVED", membership.userId);
     notifyMembershipChanged(circleId, { membershipId, userId: membership.userId, action: "MEMBERSHIP_APPROVED" });
+
+    const circleName = await circleNameOf(circleId);
+    await pushToUsers([membership.userId], {
+      title: `You're in! Welcome to ${circleName}`,
+      body: "Open Abo to see your Circle on the map.",
+      data: { type: "membership-approved", circleId },
+    });
+    // Everyone else (the approving Admin already knows).
+    const name = await nameOf(membership.userId);
+    await pushToCircle(
+      circleId,
+      {
+        title: `${name} joined ${circleName}`,
+        body: "They can now see the Circle and get SOS alerts.",
+        data: { type: "member-joined", circleId, userId: membership.userId },
+      },
+      [membership.userId, actorId]
+    );
     return updated;
   },
 

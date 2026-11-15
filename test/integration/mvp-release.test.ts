@@ -215,3 +215,40 @@ describe("Circle activity feed", () => {
     await request(app).get(`/circles/${circleId}/activity`).set(auth(outsider)).expect(403);
   });
 });
+
+describe("Push notifications for Circle events", () => {
+  /** Titles of the pushes queued for one user (no worker runs in tests). */
+  async function pushesFor(userId: string): Promise<string[]> {
+    const { pushQueue } = await import("@/queues/push.queue");
+    const jobs = await pushQueue.getJobs(["waiting", "delayed", "active", "completed", "failed", "prioritized"]);
+    return jobs.filter((j) => j?.data.userId === userId).map((j) => j.data.message.title);
+  }
+
+  it("join request, approval, responder, SOS closed and low battery each reach the right people", async () => {
+    const { admin, joiner, circleId, membershipId } = await circleWithPendingMember();
+    await request(app).patch("/users/me").set(auth(joiner)).send({ name: "Tunde" });
+
+    // 3. Join request -> Admin; approval -> joiner.
+    expect(await pushesFor(admin.userId)).toEqual(expect.arrayContaining([expect.stringContaining("wants to join")]));
+    await request(app).post(`/circles/${circleId}/memberships/${membershipId}/approve`).set(auth(admin)).expect(200);
+    expect(await pushesFor(joiner.userId)).toEqual(expect.arrayContaining([expect.stringContaining("You're in!")]));
+
+    // 1. Responder -> SOS sender, once even if tapped twice.
+    const sos = await request(app).post("/sos/trigger").set(auth(admin)).send({ circleId }).expect(201);
+    await request(app).post(`/sos/${sos.body.id}/acknowledge`).set(auth(joiner)).expect(200);
+    await request(app).post(`/sos/${sos.body.id}/acknowledge`).set(auth(joiner)).expect(200);
+    const responding = (await pushesFor(admin.userId)).filter((t) => t.includes("is responding to your SOS"));
+    expect(responding).toEqual(["Tunde is responding to your SOS"]);
+
+    // 2. Closed -> everyone except whoever closed it.
+    await request(app).post(`/sos/${sos.body.id}/resolve`).set(auth(admin)).expect(200);
+    expect(await pushesFor(joiner.userId)).toEqual(expect.arrayContaining([expect.stringContaining("is safe now")]));
+    expect((await pushesFor(admin.userId)).some((t) => t.includes("is safe now"))).toBe(false);
+
+    // 4. Low battery -> the Circle, once a day.
+    await request(app).post("/location/ping").set(auth(joiner)).send({ lat: 6.5, lng: 3.4, batteryPct: 9 }).expect(202);
+    await request(app).post("/location/ping").set(auth(joiner)).send({ lat: 6.5, lng: 3.4, batteryPct: 8 }).expect(202);
+    const battery = (await pushesFor(admin.userId)).filter((t) => t.includes("phone is at"));
+    expect(battery).toEqual(["🔋 Tunde's phone is at 9%"]);
+  });
+});
