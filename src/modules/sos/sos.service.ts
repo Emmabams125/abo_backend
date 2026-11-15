@@ -4,7 +4,7 @@ import { prisma } from "@/db/prisma.client";
 import { circlesRepository } from "@/modules/circles/circles.repository";
 import { locationRepository } from "@/modules/location/location.repository";
 import { enqueueSosNotification } from "@/modules/sos/sos.queue";
-import { sosRepository } from "@/modules/sos/sos.repository";
+import { SOS_ACTIVE_WINDOW_MS, sosRepository } from "@/modules/sos/sos.repository";
 import { emitToCircle } from "@/realtime/socket.server";
 import { SocketEvents, type SosAcknowledgedPayload, type SosTriggeredPayload } from "@/realtime/events";
 import { createReadUrl } from "@/storage/supabase-storage";
@@ -111,7 +111,9 @@ export const sosService = {
   async resolve(sosEventId: string, actorId: string) {
     const event = await sosRepository.findEventById(sosEventId);
     if (!event) throw new NotFoundError("SOS event not found");
-    if (event.userId !== actorId) await requireActiveAdmin(event.circleId, actorId);
+    // Anyone in the Circle can close it (e.g. they found them and they're
+    // fine) — otherwise an SOS the sender can't close stays red for everyone.
+    if (event.userId !== actorId) await requireActiveMember(event.circleId, actorId);
     const resolved = await sosRepository.resolve(sosEventId);
     notifySosUpdated(event.circleId, sosEventId);
     return resolved;
@@ -148,7 +150,8 @@ export const sosService = {
   /** Unresolved SOS events in the last 24h, so a missed alert still shows on Home. */
   async listActive(circleId: string, requesterId: string) {
     await requireActiveMember(circleId, requesterId);
-    const events = await sosRepository.listActiveForCircle(circleId, 24 * 60 * 60 * 1000);
+    await sosRepository.expireStale(circleId);
+    const events = await sosRepository.listActiveForCircle(circleId, SOS_ACTIVE_WINDOW_MS);
     return events.map((e) => ({ id: e.id, triggeredAt: e.triggeredAt, sender: e.user }));
   },
 

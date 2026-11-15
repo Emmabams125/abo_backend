@@ -4,6 +4,9 @@ import type { SOSDeliveryStatus } from "@prisma/client";
 /** What Circle members may see of each other (no email / medical fields). */
 const publicUserFields = { id: true, name: true, avatarUrl: true, phone: true } as const;
 
+/** How long an SOS stays active if no one closes it. */
+export const SOS_ACTIVE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 export const sosRepository = {
   findRecentActiveTrigger(userId: string, sinceMs: number) {
     return prisma.sOSEvent.findFirst({
@@ -67,6 +70,18 @@ export const sosRepository = {
   },
 
   /** Unresolved SOS events in a Circle from the last [sinceMs]. */
+  /**
+   * An SOS nobody closes shouldn't keep someone "in SOS" forever: anything
+   * still ACTIVE after SOS_ACTIVE_WINDOW_MS is resolved. Called lazily
+   * wherever a Circle's SOS state is read (dashboard, active list, feed).
+   */
+  expireStale(circleId: string) {
+    return prisma.sOSEvent.updateMany({
+      where: { circleId, status: "ACTIVE", triggeredAt: { lt: new Date(Date.now() - SOS_ACTIVE_WINDOW_MS) } },
+      data: { status: "RESOLVED" },
+    });
+  },
+
   listActiveForCircle(circleId: string, sinceMs: number) {
     return prisma.sOSEvent.findMany({
       where: { circleId, status: "ACTIVE", triggeredAt: { gte: new Date(Date.now() - sinceMs) } },

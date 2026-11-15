@@ -1,3 +1,4 @@
+import { sosRepository } from "@/modules/sos/sos.repository";
 import { ForbiddenError } from "@/common/errors/app-error";
 import { prisma } from "@/db/prisma.client";
 import { circlesRepository } from "@/modules/circles/circles.repository";
@@ -64,6 +65,7 @@ export const homeService = {
   /** FR-HOME-01/02: circle-wide safety summary + per-member status. */
   async getDashboard(circleId: string, requesterId: string) {
     await requireActiveMembership(circleId, requesterId);
+    await sosRepository.expireStale(circleId);
 
     const memberships = await circlesRepository.listActiveMemberships(circleId);
     const members = await Promise.all(memberships.map((m) => resolveMemberStatus(circleId, m.userId)));

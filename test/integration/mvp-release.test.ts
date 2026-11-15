@@ -1,5 +1,6 @@
 import request from "supertest";
 import { createApp } from "@/app";
+import { prisma } from "@/db/prisma.client";
 import { signUpUser } from "../helpers/auth";
 
 const app = createApp();
@@ -165,6 +166,31 @@ describe("SOS details for Circle members", () => {
     await request(app).post(`/sos/${sos.body.id}/resolve`).set(auth(joiner)).expect(200);
     const after = await request(app).get(`/sos/circles/${circleId}/active`).set(auth(admin)).expect(200);
     expect(after.body.map((e: { id: string }) => e.id)).not.toContain(sos.body.id);
+  });
+});
+
+describe("Closing an SOS", () => {
+  it("lets any Circle member close it, and expires one nobody closed after 24h", async () => {
+    const { admin, joiner, circleId, membershipId } = await circleWithPendingMember();
+    await request(app).post(`/circles/${circleId}/memberships/${membershipId}/approve`).set(auth(admin)).expect(200);
+
+    // The admin sends one; a plain member closes it.
+    const first = await request(app).post("/sos/trigger").set(auth(admin)).send({ circleId }).expect(201);
+    await request(app).post(`/sos/${first.body.id}/resolve`).set(auth(joiner)).expect(200);
+    const outsider = await signUpUser(app);
+    await request(app).post(`/sos/${first.body.id}/resolve`).set(auth(outsider)).expect(403);
+
+    // One left open for over a day stops counting as SOS everywhere.
+    const stale = await request(app).post("/sos/trigger").set(auth(joiner)).send({ circleId }).expect(201);
+    await prisma.sOSEvent.update({
+      where: { id: stale.body.id },
+      data: { triggeredAt: new Date(Date.now() - 25 * 60 * 60 * 1000) },
+    });
+    const dashboard = await request(app).get(`/home/circles/${circleId}`).set(auth(admin)).expect(200);
+    const status = dashboard.body.members.find((m: { userId: string }) => m.userId === joiner.userId)?.status;
+    expect(status).not.toBe("SOS");
+    const event = await prisma.sOSEvent.findUnique({ where: { id: stale.body.id } });
+    expect(event?.status).toBe("RESOLVED");
   });
 });
 

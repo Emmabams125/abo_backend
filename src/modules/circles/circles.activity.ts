@@ -1,6 +1,7 @@
 import { ForbiddenError } from "@/common/errors/app-error";
 import { prisma } from "@/db/prisma.client";
 import { circlesRepository } from "@/modules/circles/circles.repository";
+import { sosRepository } from "@/modules/sos/sos.repository";
 
 /** What Circle members may see of each other in the feed. */
 const person = { select: { id: true, name: true, avatarUrl: true } } as const;
@@ -34,6 +35,7 @@ export async function listCircleActivity(
     throw new ForbiddenError("You are not a member of this Circle");
   }
 
+  await sosRepository.expireStale(circleId);
   const since = new Date(Date.now() - WINDOW_MS);
   const limit = Math.min(options.limit ?? 50, 100);
   const userFilter = options.userId ? { userId: options.userId } : {};
