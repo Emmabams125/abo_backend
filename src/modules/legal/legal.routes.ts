@@ -7,7 +7,7 @@ import { env } from "@/config/env";
  */
 export const legalRouter = Router();
 
-const UPDATED = "14 November 2026";
+const UPDATED = "17 November 2026";
 
 function contactLine(): string {
   return env.SUPPORT_EMAIL
@@ -44,21 +44,24 @@ legalRouter.get("/privacy", (_req, res) => {
       `<h1>Abo Privacy Policy</h1>
 <p class="muted">Last updated ${UPDATED}</p>
 
-<p>Abo helps families and close friends keep each other safe: share location within a private Circle, check in, and raise an SOS. This policy explains what we collect, why, and the choices you have.</p>
+<p>Abo helps families and close friends keep each other safe: share location within a private Circle, check in, and raise an SOS. Abo is operated by Letscync Ltd, Ibadan, Nigeria ("we"). This policy explains what we collect, why, and the choices you have.</p>
 
 <h2>What we collect</h2>
 <ul>
   <li><strong>Account details:</strong> your phone number (your login), the email address your login codes are sent to, and optionally your name and profile photo.</li>
   <li><strong>Location:</strong> your device's precise location while the Abo app is open, shared only with the members of your Circle. Abo does not collect location in the background.</li>
-  <li><strong>Safety information you choose to add:</strong> emergency contacts and medical information (medical information is encrypted at rest and visible only to you).</li>
+  <li><strong>Battery level:</strong> your phone's battery percentage, sent with your location so your Circle knows if your phone may switch off.</li>
+  <li><strong>Safety information you choose to add:</strong> emergency contacts and medical information. Medical information is encrypted at rest. It is not shown to anyone in normal use; when you send an SOS, your medical information and emergency contacts are included in the alert to your Circle so they can help.</li>
+  <li><strong>SOS recordings:</strong> when you send an SOS, Abo uses your camera and microphone to record a short video (up to 60 seconds), which is shared with your Circle. Recording only happens during an SOS you start.</li>
   <li><strong>Things you create:</strong> check-ins, SOS events, community safety alerts, and any photos or videos you attach to them.</li>
-  <li><strong>Technical data:</strong> device and app information and server logs (such as IP address) needed to run and secure the service.</li>
+  <li><strong>Device and push data:</strong> a push-notification token for your phone, its platform (Android or iOS), and app information, so we can deliver alerts to you.</li>
+  <li><strong>Technical data:</strong> server logs (such as IP address) needed to run and secure the service.</li>
 </ul>
 
 <h2>How we use it</h2>
 <ul>
   <li>To log you in and keep your account secure.</li>
-  <li>To show your Circle where you are, alert them when you arrive at or leave a Safe Place, and deliver SOS and check-in notifications.</li>
+  <li>To show your Circle where you are, alert them when you arrive at or leave a Safe Place or when your battery is low, and deliver SOS, check-in and Circle notifications.</li>
   <li>To show community alerts near you.</li>
   <li>To operate, maintain and protect the service.</li>
 </ul>
@@ -66,18 +69,19 @@ legalRouter.get("/privacy", (_req, res) => {
 
 <h2>Who can see it</h2>
 <ul>
-  <li><strong>Your Circle:</strong> members see your name, photo, phone number, latest location and safety status. Admins approve who joins.</li>
+  <li><strong>Your Circle:</strong> members see your name, photo, phone number, latest location, battery level and safety status, plus your check-ins and SOS alerts (including the SOS video, medical information and emergency contacts). Admins approve who joins.</li>
+  <li><strong>People you choose to share with:</strong> from an SOS, any Circle member can share its details (location link, time, battery, phone number and a temporary video link) with people outside the Circle, for example by WhatsApp or SMS. This only happens when someone taps Share.</li>
   <li><strong>Community alerts</strong> you post are visible to Abo users nearby.</li>
-  <li><strong>Service providers</strong> who process data on our behalf: our hosting provider, Supabase (database and media storage), Google (email delivery of login codes), Termii (SMS delivery of login codes) and MapTiler (map images; receives your IP address and the map area being viewed).</li>
+  <li><strong>Service providers</strong> who process data on our behalf: our hosting provider, Supabase (database and media storage), Brevo (email delivery of login codes), Termii (SMS delivery of login codes), Google Firebase Cloud Messaging and Apple Push Notification service (delivery of notifications; they receive your push token and the notification content) and MapTiler (map images; receives your IP address and the map area being viewed). They may only use the data to provide these services to us.</li>
   <li>Authorities, when required by law or to protect someone's life or safety.</li>
 </ul>
 
 <h2>How long we keep it</h2>
-<p>Location history is kept for your Circle's retention setting (7 days by default, at most 30). Account data is kept until you delete your account.</p>
+<p>Location history is kept for your Circle's retention setting (7 days by default, at most 30). The Circle activity feed shows the last 7 days. Account data is kept until you delete your account.</p>
 
 <h2>Your choices</h2>
 <ul>
-  <li>You can turn off location permission at any time in your phone's settings; Abo then cannot share your location.</li>
+  <li>You can turn off location, camera, microphone or notification permission at any time in your phone's settings; Abo then cannot use that feature.</li>
   <li>You can edit your profile, and leave or be removed from a Circle.</li>
   <li>You can delete your account in the app (Profile &rarr; Delete account) or as described on our <a href="/delete-account">account deletion page</a>.</li>
 </ul>
