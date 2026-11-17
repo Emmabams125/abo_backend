@@ -296,10 +296,10 @@ describe("Community moderation (Play UGC policy)", () => {
       .send({ kind: "LOST_ITEM", title: "Lost blue bag", placeLabel: "Bodija", ...spot })
       .expect(201);
     expect(ids(await nearby(viewer))).toContain(second.body.id);
-    await request(app).post(`/users/${author.userId}/block`).set(auth(viewer)).expect(200);
+    await request(app).post(`/users/${author.userId}/block`).set(auth(viewer)).send({ label: "Lost blue bag" }).expect(200);
     expect(ids(await nearby(viewer))).not.toContain(second.body.id);
     const blocks = await request(app).get("/users/me/blocks").set(auth(viewer)).expect(200);
-    expect(blocks.body.map((b: { userId: string }) => b.userId)).toEqual([author.userId]);
+    expect(blocks.body).toEqual([{ userId: author.userId, label: "Lost blue bag", blockedAt: expect.any(String) }]);
     await request(app).delete(`/users/${author.userId}/block`).set(auth(viewer)).expect(200);
     expect(ids(await nearby(viewer))).toContain(second.body.id);
 

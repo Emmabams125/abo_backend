@@ -17,6 +17,7 @@ CREATE TABLE "community_reports" (
 CREATE TABLE "user_blocks" (
     "blockerId" TEXT NOT NULL,
     "blockedId" TEXT NOT NULL,
+    "label" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "user_blocks_pkey" PRIMARY KEY ("blockerId","blockedId")

@@ -335,6 +335,9 @@ model CommunityReport {
 model UserBlock {
   blockerId String
   blockedId String
+  /// What the blocker saw (e.g. the post title). Community posts are
+  /// anonymous, so the blocked person's name is never shown.
+  label     String?
   createdAt DateTime @default(now())
 
   blocker User @relation("blocker", fields: [blockerId], references: [id], onDelete: Cascade)
