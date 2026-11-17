@@ -30,3 +30,10 @@ export const nearbyQuerySchema = z.object({
 export const alertIdParamsSchema = z.object({
   alertId: z.string().uuid(),
 });
+
+export const REPORT_REASONS = ["SPAM", "ABUSIVE", "FALSE_INFORMATION", "DANGEROUS", "OTHER"] as const;
+
+export const reportAlertSchema = z.object({
+  reason: z.enum(REPORT_REASONS),
+  details: z.string().trim().max(500).optional(),
+});

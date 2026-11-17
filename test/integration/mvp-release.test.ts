@@ -252,3 +252,62 @@ describe("Push notifications for Circle events", () => {
     expect(battery).toEqual(["🔋 Tunde's phone is at 9%"]);
   });
 });
+
+describe("Community moderation (Play UGC policy)", () => {
+  const spot = { lat: 7.3775, lng: 3.947 };
+  const nearby = (user: User) =>
+    request(app).get("/community/nearby").query({ ...spot, radiusM: 5000 }).set(auth(user)).expect(200);
+  const ids = (res: request.Response) => res.body.map((a: { id: string }) => a.id);
+
+  it("report hides a post for the reporter, 3 reports hide it for everyone, and blocking hides an author", async () => {
+    const author = await signUpUser(app);
+    const [r1, r2, r3, viewer] = await Promise.all([signUpUser(app), signUpUser(app), signUpUser(app), signUpUser(app)]);
+    const post = await request(app)
+      .post("/community")
+      .set(auth(author))
+      .send({ kind: "HAZARD", title: "Fallen tree on the road", placeLabel: "Ring Road", ...spot })
+      .expect(201);
+
+    expect(ids(await nearby(r1))).toContain(post.body.id);
+    await request(app).post(`/community/${post.body.id}/report`).set(auth(author)).send({ reason: "SPAM" }).expect(400);
+
+    // One report: gone for that reporter only.
+    const first = await request(app)
+      .post(`/community/${post.body.id}/report`)
+      .set(auth(r1))
+      .send({ reason: "FALSE_INFORMATION", details: "No tree there" })
+      .expect(200);
+    expect(first.body).toEqual({ reported: true, hidden: false });
+    expect(ids(await nearby(r1))).not.toContain(post.body.id);
+    expect(ids(await nearby(viewer))).toContain(post.body.id);
+
+    // Reporting twice doesn't count twice.
+    await request(app).post(`/community/${post.body.id}/report`).set(auth(r1)).send({ reason: "SPAM" }).expect(200);
+    await request(app).post(`/community/${post.body.id}/report`).set(auth(r2)).send({ reason: "SPAM" }).expect(200);
+    expect(ids(await nearby(viewer))).toContain(post.body.id);
+    const third = await request(app).post(`/community/${post.body.id}/report`).set(auth(r3)).send({ reason: "ABUSIVE" }).expect(200);
+    expect(third.body.hidden).toBe(true);
+    expect(ids(await nearby(viewer))).not.toContain(post.body.id);
+
+    // Blocking hides everything that author posts; unblocking brings it back.
+    const second = await request(app)
+      .post("/community")
+      .set(auth(author))
+      .send({ kind: "LOST_ITEM", title: "Lost blue bag", placeLabel: "Bodija", ...spot })
+      .expect(201);
+    expect(ids(await nearby(viewer))).toContain(second.body.id);
+    await request(app).post(`/users/${author.userId}/block`).set(auth(viewer)).expect(200);
+    expect(ids(await nearby(viewer))).not.toContain(second.body.id);
+    const blocks = await request(app).get("/users/me/blocks").set(auth(viewer)).expect(200);
+    expect(blocks.body.map((b: { userId: string }) => b.userId)).toEqual([author.userId]);
+    await request(app).delete(`/users/${author.userId}/block`).set(auth(viewer)).expect(200);
+    expect(ids(await nearby(viewer))).toContain(second.body.id);
+
+    await request(app).post(`/users/${viewer.userId}/block`).set(auth(viewer)).expect(400);
+  });
+
+  it("serves the Community guidelines page", async () => {
+    const page = await request(app).get("/community-guidelines").expect(200);
+    expect(page.text).toContain("Community guidelines");
+  });
+});

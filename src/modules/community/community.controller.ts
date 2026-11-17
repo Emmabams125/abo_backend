@@ -15,8 +15,18 @@ export const communityController = {
       radiusM: number;
       kind?: CommunityAlertKind;
     };
-    const alerts = await communityService.listNearby(query);
+    const alerts = await communityService.listNearby(req.userId!, query);
     res.status(200).json(alerts);
+  },
+
+  async reportAlert(req: Request, res: Response) {
+    const result = await communityService.reportAlert(
+      req.params.alertId!,
+      req.userId!,
+      req.body.reason,
+      req.body.details
+    );
+    res.status(200).json(result);
   },
 
   async resolveAlert(req: Request, res: Response) {

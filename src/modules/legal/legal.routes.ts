@@ -71,7 +71,8 @@ legalRouter.get("/privacy", (_req, res) => {
 <ul>
   <li><strong>Your Circle:</strong> members see your name, photo, phone number, latest location, battery level and safety status, plus your check-ins and SOS alerts (including the SOS video, medical information and emergency contacts). Admins approve who joins.</li>
   <li><strong>People you choose to share with:</strong> from an SOS, any Circle member can share its details (location link, time, battery, phone number and a temporary video link) with people outside the Circle, for example by WhatsApp or SMS. This only happens when someone taps Share.</li>
-  <li><strong>Community alerts</strong> you post are visible to Abo users nearby.</li>
+  <li><strong>Community alerts</strong> you post (title, description, place, photo or video, and the area they're about) are visible to Abo users nearby. Your name and exact coordinates are not shown. Posts must follow our <a href="/community-guidelines">Community guidelines</a>.</li>
+  <li><strong>Reports and blocks:</strong> if you report a post, we keep the report (reason and any note) and the post's details so our team can review it. If you block someone, we keep that so their posts stay hidden from you. The person you report or block is not told.</li>
   <li><strong>Service providers</strong> who process data on our behalf: our hosting provider, Supabase (database and media storage), Brevo (email delivery of login codes), Termii (SMS delivery of login codes), Google Firebase Cloud Messaging and Apple Push Notification service (delivery of notifications; they receive your push token and the notification content) and MapTiler (map images; receives your IP address and the map area being viewed). They may only use the data to provide these services to us.</li>
   <li>Authorities, when required by law or to protect someone's life or safety.</li>
 </ul>
@@ -124,6 +125,44 @@ legalRouter.get("/delete-account", (_req, res) => {
 
 <h2>What may be kept</h2>
 <p>Records of past SOS events, messages and community alerts you created are kept without your name or contact details, so other members' safety history stays intact. Server logs are kept for up to 30 days for security.</p>`
+    )
+  );
+});
+
+legalRouter.get("/community-guidelines", (_req, res) => {
+  res.type("html").send(
+    page(
+      "Community guidelines",
+      `<h1>Abo Community guidelines</h1>
+<p class="muted">Last updated ${UPDATED}</p>
+
+<p>Community alerts help neighbours look out for each other: a missing person, a lost item, or a hazard nearby. Everyone who posts agrees to these rules.</p>
+
+<h2>Post only</h2>
+<ul>
+  <li>Real, current safety information: missing people, lost items, and hazards such as accidents, flooding or fires.</li>
+  <li>Photos and videos that help others recognise the person, item or danger.</li>
+</ul>
+
+<h2>Never post</h2>
+<ul>
+  <li>False or misleading alerts, pranks, or spam and advertising.</li>
+  <li>Harassment, hate, threats, or content that targets a person or group.</li>
+  <li>Sexual content, graphic violence, or anything that exploits or endangers children.</li>
+  <li>Private information about someone else (such as their address or phone number) unless it is needed to reunite a missing person with family and you have their family's consent.</li>
+  <li>Anything illegal, or that encourages dangerous or illegal acts.</li>
+</ul>
+
+<h2>Reporting and blocking</h2>
+<ul>
+  <li>Tap <strong>&#8942;</strong> on any post to <strong>report</strong> it or <strong>block</strong> the person who posted it. You won't see posts you've reported or posts from people you've blocked.</li>
+  <li>Our team reviews every report. Posts reported by several people are hidden automatically until reviewed.</li>
+  <li>We remove posts that break these rules and may suspend or delete accounts that break them repeatedly or seriously.</li>
+  <li>In an emergency, contact local emergency services first.</li>
+</ul>
+
+<h2>Contact</h2>
+<p>To report a problem or appeal a decision, ${contactLine()}.</p>`
     )
   );
 });

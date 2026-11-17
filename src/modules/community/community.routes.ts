@@ -8,6 +8,7 @@ import {
   alertIdParamsSchema,
   createAlertSchema,
   nearbyQuerySchema,
+  reportAlertSchema,
 } from "@/modules/community/community.validation";
 
 export const communityRouter = Router();
@@ -25,6 +26,12 @@ communityRouter.get(
   "/nearby",
   validate({ query: nearbyQuerySchema }),
   asyncHandler(communityController.listNearby)
+);
+
+communityRouter.post(
+  "/:alertId/report",
+  validate({ params: alertIdParamsSchema, body: reportAlertSchema }),
+  asyncHandler(communityController.reportAlert)
 );
 
 communityRouter.patch(

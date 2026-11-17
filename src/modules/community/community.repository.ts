@@ -55,7 +55,13 @@ export const communityRepository = {
    * requester's point — so a viewer can't derive another user's precise
    * location from an alert they didn't post.
    */
-  listNearby(lat: number, lng: number, radiusM: number, kind?: CommunityAlertKind): Promise<NearbyAlert[]> {
+  listNearby(
+    lat: number,
+    lng: number,
+    radiusM: number,
+    kind: CommunityAlertKind | undefined,
+    viewerId: string
+  ): Promise<NearbyAlert[]> {
     const kindFilter = kind ? Prisma.sql`AND "kind" = ${kind}::"CommunityAlertKind"` : Prisma.empty;
     return prisma.$queryRaw<NearbyAlert[]>`
       SELECT
@@ -74,6 +80,9 @@ export const communityRepository = {
         AND "expiresAt" > now()
         AND ST_DWithin("location", ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography, ${radiusM})
         ${kindFilter}
+        -- Not from people this viewer blocked, and not posts they reported.
+        AND "authorId" NOT IN (SELECT "blockedId" FROM "user_blocks" WHERE "blockerId" = ${viewerId})
+        AND id NOT IN (SELECT "alertId" FROM "community_reports" WHERE "reporterId" = ${viewerId})
       ORDER BY "createdAt" DESC
     `;
   },
